@@ -186,7 +186,9 @@ class RoomListPageState extends State<RoomListPage> {
                       )
                     : Container(),
                 onTap: () async {
-                  context.push(ChatPage(chatRoomId: room.id));
+                  context.push(WillPopScope(
+                      onWillPop: () async => false, child: ChatPage(chatRoomId: room.id)
+                  ));
                 },
               );
             });
