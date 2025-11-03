@@ -8,7 +8,6 @@ import 'package:qiscus_chat_sdk/qiscus_chat_sdk.dart';
 
 import '../constants.dart';
 import '../extensions.dart';
-import '../main.dart';
 import '../qiscus_util.dart';
 import '../widget/avatar_widget.dart';
 import 'chat_page.dart';
@@ -46,7 +45,7 @@ class RoomListPageState extends State<RoomListPage> {
     var qiscus = context.watch<QiscusUtil>();
     var firebase = context.watch<FirebaseMessaging>();
     var account = qiscus.getCurrentUser();
-    logger.d('data: $account');
+    // logger.d('data: $account'); // Commented out - logger not available in new implementation
     var rooms = context.select<QiscusUtil, List<QChatRoom>>((it) {
       return it.rooms.toList().where((r) => r.lastMessage != null).toList()
         ..sort((r1, r2) {
@@ -99,7 +98,7 @@ class RoomListPageState extends State<RoomListPage> {
                     final token = await firebase.getToken();
                     if(token != null){
                       qiscus.qiscus.removeDeviceToken(token: token);
-                      logger.d("QISCUS token $token REMOVED");
+                      // logger.d("QISCUS token $token REMOVED"); // Commented out - logger not available
                     }
                     qiscus.clearUser();
                     context.pushReplacement(const LoginPage());
