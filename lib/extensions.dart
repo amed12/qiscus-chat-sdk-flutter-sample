@@ -2,12 +2,17 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:logger/logger.dart';
-import 'package:provider/provider.dart';
 
 extension BuildContextX on BuildContext {
   void debugLog(dynamic arg, [dynamic error, StackTrace? stackTrace]) {
-    read<Logger>().d(arg, error, stackTrace);
+    // Logger not available in new implementation - using print instead
+    if (error != null && stackTrace != null) {
+      print('$arg - Error: $error\nStackTrace: $stackTrace');
+    } else if (error != null) {
+      print('$arg - Error: $error');
+    } else {
+      print(arg);
+    }
   }
 
   void pop<T extends Object>([T? result]) {

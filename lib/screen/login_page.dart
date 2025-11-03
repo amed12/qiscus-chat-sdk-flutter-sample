@@ -7,7 +7,6 @@ import 'package:qiscus_chat_sdk/qiscus_chat_sdk.dart';
 import '../constants.dart';
 import '../extensions.dart';
 import 'chat_page.dart';
-import 'room_list_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({

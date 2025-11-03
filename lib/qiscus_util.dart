@@ -522,7 +522,8 @@ class QiscusUtil extends ChangeNotifier implements ReassembleHandler {
       var userId = room.participants.firstWhere((u) => u.id != account?.id);
       qiscus.subscribeUserOnlinePresence(userId.id);
     } catch (er) {
-      logger.e('Could not subscribe user presence for room(${room.id})', er);
+      // logger.e('Could not subscribe user presence for room(${room.id})', er);
+      debugPrint('Could not subscribe user presence for room(${room.id}): $er');
     }
   }
 }

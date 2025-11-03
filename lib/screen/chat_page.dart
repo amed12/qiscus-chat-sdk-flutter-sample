@@ -42,8 +42,8 @@ class ChatPageState extends State<ChatPage> {
   QiscusUtil? qiscus;
   List<int> visibleMessagesIds = [];
 
-  late StreamSubscription _messageReceivedSubscription;
-  late StreamSubscription _roomClearedSubscription;
+  StreamSubscription? _messageReceivedSubscription;
+  StreamSubscription? _roomClearedSubscription;
 
   Future<void> _initializePage(BuildContext context) async {
     var qiscus = context.read<QiscusUtil>();
@@ -57,6 +57,25 @@ class ChatPageState extends State<ChatPage> {
 
     qiscus.subscribeRoom(room);
     qiscus.subscribePresence(room);
+    
+    // Subscribe to message received events
+    _messageReceivedSubscription = qiscus.qiscus.onMessageReceived().listen((message) {
+      if (message.chatRoomId == chatRoomId) {
+        debugPrint('Message received in chat room: ${message.text}');
+      }
+    });
+    
+    // Subscribe to room cleared events
+    _roomClearedSubscription = qiscus.qiscus.onChatRoomCleared().listen((roomId) {
+      if (roomId == chatRoomId) {
+        debugPrint('Chat room cleared: $roomId');
+        if (mounted) {
+          setState(() {
+            // Refresh UI after room is cleared
+          });
+        }
+      }
+    });
   }
 
   @override
@@ -70,7 +89,10 @@ class ChatPageState extends State<ChatPage> {
 
   @override
   void dispose() {
-    super.dispose();
+    // Cancel subscriptions
+    _messageReceivedSubscription?.cancel();
+    _roomClearedSubscription?.cancel();
+    
     if (visibleMessagesIds.isNotEmpty) {
       int lastMessageVisible = visibleMessagesIds
           .reduce((value1, value2) => value1 > value2 ? value1 : value2);
@@ -80,26 +102,25 @@ class ChatPageState extends State<ChatPage> {
     if (room != null) {
       qiscus?.unsubscribeRoom(room!);
     }
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     var qiscus = context.watch<QiscusUtil>();
     var account = qiscus.getCurrentUser();
+    var room = qiscus.rooms.safeWhere((element) => element.id == chatRoomId);
     var messages = QiscusUtil.getMessagesFor(context, chatRoomId: chatRoomId);
 
     var presence = QiscusUtil.getPresenceForRoomId(context, chatRoomId);
     var typing = QiscusUtil.getTypingForRoomId(context, chatRoomId);
-    var room = qiscus.rooms.safeWhere((element) => element.id == chatRoomId);
 
     context.debugLog('room: $room');
 
-    return WillPopScope(
-      onWillPop: () async {
-        // _messageReceivedSubscription.cancel();
-        // _roomClearedSubscription.cancel();
-
-        return true;
+    return PopScope(
+      canPop: true,
+      onPopInvoked: (didPop) {
+        // Subscriptions will be canceled in dispose()
       },
       child: Scaffold(
         appBar: AppBar(
@@ -176,8 +197,10 @@ class ChatPageState extends State<ChatPage> {
                             _sendMessagePostBack(context, data);
                             Future.delayed(const Duration(milliseconds: 300),
                                 () {
-                              scrollController.jumpTo(
-                                  scrollController.position.maxScrollExtent);
+                              if (mounted) {
+                                scrollController.jumpTo(
+                                    scrollController.position.maxScrollExtent);
+                              }
                             });
                           } else {
                             showModalBottomSheet(
@@ -322,10 +345,7 @@ class ChatPageState extends State<ChatPage> {
     return Text(
       isOnline
           ? 'Online'
-          // ignore: unnecessary_null_comparison
-          : lastSeen != null
-              ? timeago.format(lastSeen)
-              : 'Offline',
+          : timeago.format(lastSeen),
       style: const TextStyle(
         fontSize: 10,
         fontStyle: FontStyle.italic,
@@ -348,12 +368,9 @@ class ChatPageState extends State<ChatPage> {
 
   void _publishTyping(BuildContext context) {
     var qiscus = context.read<QiscusSDK>();
-    Timer? timer;
-
-    if (timer != null && timer.isActive == true) timer.cancel();
 
     qiscus.publishTyping(roomId: chatRoomId, isTyping: true);
-    timer = Timer(const Duration(seconds: 1), () {
+    Timer(const Duration(seconds: 1), () {
       qiscus.publishTyping(roomId: chatRoomId, isTyping: false);
     });
   }
@@ -365,7 +382,7 @@ class ChatPageState extends State<ChatPage> {
 
     try {
       var file = await FilePicker.platform.getFile(type: FileType.image);
-      if (file != null) {
+      if (file != null && mounted) {
         var message = sdk.generateFileAttachmentMessage(
           chatRoomId: chatRoomId,
           caption: file.path.split('/').last,
