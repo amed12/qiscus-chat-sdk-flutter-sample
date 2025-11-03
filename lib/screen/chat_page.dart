@@ -85,15 +85,12 @@ class ChatPageState extends State<ChatPage> {
   @override
   Widget build(BuildContext context) {
     var qiscus = context.watch<QiscusUtil>();
-    var account = context.watch<QAccount?>();
-    var room = context.select<QiscusUtil, QChatRoom?>((it) {
-      return it.rooms.safeWhere((element) => element.id == chatRoomId);
-    });
     var account = qiscus.getCurrentUser();
     var messages = QiscusUtil.getMessagesFor(context, chatRoomId: chatRoomId);
 
     var presence = QiscusUtil.getPresenceForRoomId(context, chatRoomId);
     var typing = QiscusUtil.getTypingForRoomId(context, chatRoomId);
+    var room = qiscus.rooms.safeWhere((element) => element.id == chatRoomId);
 
     context.debugLog('room: $room');
 
