@@ -8,7 +8,7 @@ This sample demonstrates how to build a full-featured chat application using the
 
 **Built with:**
 - ✅ Flutter 3.x
-- ✅ Qiscus Chat SDK 2.0.11
+- ✅ [Qiscus Chat SDK 2.2.1](https://pub.dev/packages/qiscus_chat_sdk)
 - ✅ Provider for state management
 - ✅ Material 3 design
 - ✅ Firebase integration
@@ -224,7 +224,7 @@ context.watch<ChatProvider>().messages
 flutter: sdk: flutter
 
 # Qiscus Chat SDK
-qiscus_chat_sdk: ^2.0.11
+qiscus_chat_sdk: ^2.2.1
 
 # State Management
 provider: ^6.0.5
