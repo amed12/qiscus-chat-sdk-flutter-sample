@@ -667,9 +667,10 @@ packages:
   qiscus_chat_sdk:
     dependency: "direct main"
     description:
-      path: "../qiscus-chat-sdk-flutter"
-      relative: true
-    source: path
+      name: qiscus_chat_sdk
+      sha256: "8cb606e6d467940d10d1e610bd9f83a05fa348ae7279f8a7ac22877cdf8c7c0a"
+      url: "https://pub.dev"
+    source: hosted
     version: "2.2.1"
   rxdart:
     dependency: transitive
