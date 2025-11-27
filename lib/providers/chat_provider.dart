@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:qiscus_chat_sdk/qiscus_chat_sdk.dart';
 import 'package:qiscus_chat_flutter_sample/services/qiscus_service.dart';
 
@@ -8,21 +9,20 @@ class ChatProvider with ChangeNotifier {
   final QiscusService _qiscusService = QiscusService.instance;
 
   ChatConnectionStatus _connectionStatus = ChatConnectionStatus.connected;
-  List<QChatRoom> _chatRooms = [];
   QChatRoom? _currentRoom;
   List<QMessage> _messages = [];
   bool _isLoading = false;
   bool _isLoadingMore = false;
+  bool _isLogin = false;
   String? _error;
   Map<String, bool> _typingUsers = {};
   final Map<String, bool> _onlineUsers = {};
   int _unreadCount = 0;
   // Track upload progress for each message (uniqueId -> progress percentage)
   final Map<String, int> _uploadProgress = {};
-
-  List<QChatRoom> get chatRooms => _chatRooms;
   QChatRoom? get currentRoom => _currentRoom;
   List<QMessage> get messages => _messages;
+  bool get isLogin => _isLogin;
   bool get isLoading => _isLoading;
   bool get isLoadingMore => _isLoadingMore;
   String? get error => _error;
@@ -112,108 +112,16 @@ class ChatProvider with ChangeNotifier {
     _connectedSub = _qiscusService.sdk.onConnected().listen((_) {
       _setConnectionStatus(ChatConnectionStatus.connected);
     });
-    _disconnectedSub = _qiscusService.sdk.onDisconnected().listen((_) {
+    _disconnectedSub = _qiscusService.sdk.onDisconnected().listen((_) async {
+      //delay 1 second
+      await Future.delayed(const Duration(seconds: 3));
       _setConnectionStatus(ChatConnectionStatus.disconnected);
+      await _qiscusService.sdk.openRealtimeConnection().then((_) {
+        _setConnectionStatus(ChatConnectionStatus.connected);
+      }).onError((_, __) {
+        _setConnectionStatus(ChatConnectionStatus.disconnected);
+      });
     });
-  }
-
-  /// Load all chat rooms
-  Future<void> loadChatRooms({
-    bool? showParticipant = true,
-    int? limit = 20,
-    int? page,
-  }) async {
-    _setLoading(true);
-    _error = null;
-
-    try {
-      final rooms = await _qiscusService.getAllChatRooms(
-        showParticipant: showParticipant,
-        limit: limit,
-        page: page,
-      );
-
-      _chatRooms = rooms;
-      _setLoading(false);
-      await _updateUnreadCount();
-    } catch (e) {
-      _error = e.toString();
-      _setLoading(false);
-    }
-  }
-
-  /// Create 1-on-1 chat
-  Future<QChatRoom?> createChat({
-    required String userId,
-    Map<String, dynamic>? extras,
-  }) async {
-    _setLoading(true);
-    _error = null;
-
-    try {
-      final room = await _qiscusService.createChatRoom(
-        userId: userId,
-        extras: extras,
-      );
-      _setLoading(false);
-      return room;
-    } catch (e) {
-      _error = e.toString();
-      _setLoading(false);
-      return null;
-    }
-  }
-
-  /// Create group chat
-  Future<QChatRoom?> createGroupChat({
-    required String name,
-    required List<String> userIds,
-    String? avatarUrl,
-    Map<String, dynamic>? extras,
-  }) async {
-    _setLoading(true);
-    _error = null;
-
-    try {
-      final room = await _qiscusService.createGroupChat(
-        name: name,
-        userIds: userIds,
-        avatarUrl: avatarUrl,
-        extras: extras,
-      );
-      _setLoading(false);
-      return room;
-    } catch (e) {
-      _error = e.toString();
-      _setLoading(false);
-      return null;
-    }
-  }
-
-  /// Create or get channel
-  Future<QChatRoom?> createChannel({
-    required String uniqueId,
-    String? name,
-    String? avatarUrl,
-    Map<String, dynamic>? extras,
-  }) async {
-    _setLoading(true);
-    _error = null;
-
-    try {
-      final room = await _qiscusService.createChannel(
-        uniqueId: uniqueId,
-        name: name,
-        avatarUrl: avatarUrl,
-        extras: extras,
-      );
-      _setLoading(false);
-      return room;
-    } catch (e) {
-      _error = e.toString();
-      _setLoading(false);
-      return null;
-    }
   }
 
   /// Enter chat room
@@ -237,24 +145,41 @@ class ChatProvider with ChangeNotifier {
           messageId: _messages.last.id,
         );
       }
-
+      _isLogin = true;
       _setLoading(false);
+      notifyListeners();
     } catch (e) {
       _error = e.toString();
       _setLoading(false);
+      _isLogin = false;
+      notifyListeners();
     }
   }
 
   /// Leave chat room
-  void leaveChatRoom() {
+  void leaveChatRoom({bool notify = true}) {
     if (_currentRoom != null) {
       _qiscusService.unsubscribeChatRoom(_currentRoom!);
       _currentRoom = null;
       _messages = [];
       _typingUsers = {};
-      notifyListeners();
+      _isLogin = false;
+      if (notify) {
+        final scheduler = SchedulerBinding.instance;
+        final phase = scheduler.schedulerPhase;
+        if (phase == SchedulerPhase.idle ||
+            phase == SchedulerPhase.postFrameCallbacks) {
+          notifyListeners();
+        } else {
+          scheduler.addPostFrameCallback((_) {
+            if (hasListeners) {
+              notifyListeners();
+            }
+          });
+        }
+      }
     }
-  }
+  }                     
 
   /// Send text message
   Future<void> sendMessage(String text) async {
@@ -494,6 +419,11 @@ class ChatProvider with ChangeNotifier {
     }
   }
 
+  /// Expose unread count refresh for UI triggers
+  Future<void> refreshUnreadCount() async {
+    await _updateUnreadCount();
+  }
+
   /// Add or update message to list
   void _addMessage(QMessage message) {
     final index = _messages.indexWhere((m) => m.id == message.id);
@@ -535,11 +465,6 @@ class ChatProvider with ChangeNotifier {
 
   void _setLoading(bool value) {
     _isLoading = value;
-    notifyListeners();
-  }
-
-  void clearError() {
-    _error = null;
     notifyListeners();
   }
 

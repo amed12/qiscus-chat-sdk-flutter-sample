@@ -48,7 +48,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     _messageController.dispose();
     _scrollController.dispose();
     // Use saved reference instead of context.read()
-    _chatProvider.leaveChatRoom();
+    _chatProvider.leaveChatRoom(notify: false);
     super.dispose();
   }
 
@@ -140,150 +140,205 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Widget build(BuildContext context) {
     final currentUserId = context.read<AuthProvider>().currentUser?.id;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(widget.room.name ?? 'Chat'),
-            Consumer<ChatProvider>(
-              builder: (context, chatProvider, _) {
-                final typingUsers = chatProvider.typingUsers.entries
-                    .where((e) => e.value && e.key != currentUserId)
-                    .map((e) => e.key)
-                    .toList();
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
 
-                if (typingUsers.isNotEmpty) {
-                  return const Text(
-                    'typing...',
-                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+        final shouldExit = await _confirmLeaveRoom();
+        if (!mounted) return;
+
+        if (shouldExit) {
+          _handleBackNavigation();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () async {
+              final shouldExit = await _confirmLeaveRoom();
+              if (!mounted) return;
+              if (shouldExit) {
+                _handleBackNavigation();
+              }
+            },
+          ),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.room.name ?? 'Chat'),
+              Consumer<ChatProvider>(
+                builder: (context, chatProvider, _) {
+                  final typingUsers = chatProvider.typingUsers.entries
+                      .where((e) => e.value && e.key != currentUserId)
+                      .map((e) => e.key)
+                      .toList();
+
+                  if (typingUsers.isNotEmpty) {
+                    return const Text(
+                      'typing...',
+                      style:
+                          TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+            ],
+          ),
+          actions: [
+            PopupMenuButton<String>(
+              onSelected: (value) async {
+                if (value == 'clear') {
+                  final chatProvider = context.read<ChatProvider>();
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Clear Messages'),
+                      content: const Text(
+                        'Are you sure you want to clear all messages?',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('Clear'),
+                        ),
+                      ],
+                    ),
                   );
+
+                  if (!mounted) return;
+                  if (confirm == true) {
+                    await chatProvider.clearMessages();
+                  }
+                } else if (value == 'participants') {
+                  _showParticipants();
                 }
-                return const SizedBox.shrink();
               },
+              itemBuilder: (context) => [
+                if (widget.room.type == QRoomType.group)
+                  const PopupMenuItem(
+                    value: 'participants',
+                    child: Text('Participants'),
+                  ),
+                const PopupMenuItem(
+                  value: 'clear',
+                  child: Text('Clear Messages'),
+                ),
+              ],
             ),
           ],
         ),
-        actions: [
-          PopupMenuButton<String>(
-            onSelected: (value) async {
-              if (value == 'clear') {
-                final chatProvider = context.read<ChatProvider>();
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Clear Messages'),
-                    content: const Text(
-                      'Are you sure you want to clear all messages?',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text('Clear'),
+        body: Column(
+          children: [
+            Consumer<ChatProvider>(
+              builder: (context, chatProvider, _) {
+                if (chatProvider.connectionStatus ==
+                    ChatConnectionStatus.connected) {
+                  return const SizedBox.shrink();
+                }
+                return Container(
+                  width: double.infinity,
+                  color: Colors.orange.shade100,
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.wifi_off, size: 16, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Text(
+                        'Reconnecting... Please check your connection',
+                        style: TextStyle(color: Colors.orange),
                       ),
                     ],
                   ),
                 );
+              },
+            ),
+            Expanded(
+              child: Consumer<ChatProvider>(
+                builder: (context, chatProvider, _) {
+                  if (chatProvider.isLoading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-                if (!mounted) return;
-                if (confirm == true) {
-                  await chatProvider.clearMessages();
-                }
-              } else if (value == 'participants') {
-                _showParticipants();
-              }
-            },
-            itemBuilder: (context) => [
-              if (widget.room.type == QRoomType.group)
-                const PopupMenuItem(
-                  value: 'participants',
-                  child: Text('Participants'),
-                ),
-              const PopupMenuItem(
-                value: 'clear',
-                child: Text('Clear Messages'),
+                  if (chatProvider.messages.isEmpty) {
+                    return const Center(
+                      child: Text('No messages yet. Start the conversation!'),
+                    );
+                  }
+
+                  return ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: chatProvider.messages.length +
+                        (chatProvider.isLoadingMore ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (chatProvider.isLoadingMore && index == 0) {
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(8.0),
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                      }
+
+                      final messageIndex = chatProvider.isLoadingMore
+                          ? index - 1
+                          : index;
+                      final message = chatProvider.messages[messageIndex];
+                      final isMe = message.sender.id == currentUserId;
+
+                      return MessageBubble(
+                        message: message,
+                        isMe: isMe,
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+            _buildMessageInput(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _handleBackNavigation() {
+    if (_chatProvider.currentRoom != null) {
+      _chatProvider.leaveChatRoom();
+    }
+    if (!mounted) return;
+    Navigator.of(context).pop();
+  }
+
+  Future<bool> _confirmLeaveRoom() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Leave chat?'),
+            content:
+                const Text('You will stop receiving updates from this room.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Stay'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Leave'),
               ),
             ],
           ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Consumer<ChatProvider>(
-            builder: (context, chatProvider, _) {
-              if (chatProvider.connectionStatus ==
-                  ChatConnectionStatus.connected) {
-                return const SizedBox.shrink();
-              }
-              return Container(
-                width: double.infinity,
-                color: Colors.orange.shade100,
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.wifi_off, size: 16, color: Colors.orange),
-                    SizedBox(width: 8),
-                    Text(
-                      'Reconnecting... Please check your connection',
-                      style: TextStyle(color: Colors.orange),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          Expanded(
-            child: Consumer<ChatProvider>(
-              builder: (context, chatProvider, _) {
-                if (chatProvider.isLoading) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (chatProvider.messages.isEmpty) {
-                  return const Center(
-                    child: Text('No messages yet. Start the conversation!'),
-                  );
-                }
-
-                return ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: chatProvider.messages.length +
-                      (chatProvider.isLoadingMore ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (chatProvider.isLoadingMore && index == 0) {
-                      return const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: CircularProgressIndicator(),
-                        ),
-                      );
-                    }
-
-                    final messageIndex = chatProvider.isLoadingMore
-                        ? index - 1
-                        : index;
-                    final message = chatProvider.messages[messageIndex];
-                    final isMe = message.sender.id == currentUserId;
-
-                    return MessageBubble(
-                      message: message,
-                      isMe: isMe,
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-          _buildMessageInput(),
-        ],
-      ),
-    );
+        ) ??
+        false;
   }
 
   Widget _buildMessageInput() {

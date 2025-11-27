@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:qiscus_chat_flutter_sample/constants.dart';
 import 'package:qiscus_chat_flutter_sample/providers/auth_provider.dart';
 import 'package:qiscus_chat_flutter_sample/screens/chat_room_screen.dart';
+import 'package:qiscus_chat_flutter_sample/screens/resume_session_screen.dart';
 import 'package:qiscus_chat_flutter_sample/services/multichannel_api.dart';
 import 'package:qiscus_chat_flutter_sample/services/qiscus_service.dart';
 import 'package:qiscus_chat_flutter_sample/services/session_service.dart';
@@ -21,6 +22,25 @@ class _LoginScreenState extends State<LoginScreen> {
   final _usernameController = TextEditingController();
   final _avatarUrlController = TextEditingController();
   bool _isStartingChat = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkExistingSession();
+    });
+  }
+
+  Future<void> _checkExistingSession() async {
+    final session = await SessionService.loadSession();
+    if (session != null && mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => ResumeSessionScreen(session: session),
+        ),
+      );
+    }
+  }
 
   @override
   void dispose() {
@@ -97,9 +117,13 @@ class _LoginScreenState extends State<LoginScreen> {
       final room = await QiscusService.instance.getChatRoomById(roomId);
 
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
+      await Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => ChatRoomScreen(room: room)),
       );
+      // Re-check session when returning from ChatRoomScreen
+      if (mounted) {
+        _checkExistingSession();
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

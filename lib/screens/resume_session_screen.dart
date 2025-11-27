@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:qiscus_chat_flutter_sample/constants.dart';
 import 'package:qiscus_chat_flutter_sample/providers/auth_provider.dart';
+import 'package:qiscus_chat_flutter_sample/providers/chat_provider.dart';
 import 'package:qiscus_chat_flutter_sample/screens/chat_room_screen.dart';
 import 'package:qiscus_chat_flutter_sample/screens/login_screen.dart';
 import 'package:qiscus_chat_flutter_sample/services/qiscus_service.dart';
@@ -21,6 +22,15 @@ class _ResumeSessionScreenState extends State<ResumeSessionScreen> {
   bool _isLoading = false;
 
   Map<String, dynamic> get _session => widget.session;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<ChatProvider>().refreshUnreadCount();
+    });
+  }
 
   Future<void> _resumeChat() async {
     setState(() => _isLoading = true);
@@ -47,7 +57,7 @@ class _ResumeSessionScreenState extends State<ResumeSessionScreen> {
       final room = await QiscusService.instance.getChatRoomById(roomId);
 
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
+      Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => ChatRoomScreen(room: room)),
       );
     } catch (e) {
@@ -161,6 +171,19 @@ class _ResumeSessionScreenState extends State<ResumeSessionScreen> {
             ),
           ],
         ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: Consumer<ChatProvider>(
+        builder: (context, chatProvider, _) {
+          final count = chatProvider.unreadCount;
+          if (count <= 0) return const SizedBox.shrink();
+
+          return FloatingActionButton.extended(
+            onPressed: _isLoading ? null : _resumeChat,
+            icon: const Icon(Icons.chat_bubble),
+            label: Text('$count unread'),
+          );
+        },
       ),
     );
   }
