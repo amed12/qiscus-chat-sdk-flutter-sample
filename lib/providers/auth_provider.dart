@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:qiscus_chat_sdk/qiscus_chat_sdk.dart';
+import 'package:qiscus_chat_flutter_sample/constants.dart';
 import 'package:qiscus_chat_flutter_sample/services/qiscus_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -119,7 +120,15 @@ class AuthProvider with ChangeNotifier {
       _setLoading(false);
       return true;
     } catch (e) {
-      _error = e.toString();
+      final code = _extractStatusCode(e);
+      final friendlyMessage =
+          code != null ? QiscusErrorCodes.messages[code] : null;
+
+      if (code == QiscusErrorCodes.unauthorized) {
+        await _clearCredentials();
+      }
+
+      _error = friendlyMessage ?? e.toString();
       _setLoading(false);
       return false;
     }
@@ -212,5 +221,16 @@ class AuthProvider with ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  int? _extractStatusCode(Object error) {
+    final message = error.toString();
+    final codeMatch = RegExp(r'\"status\"\s*:\s*(\d+)').firstMatch(message) ??
+        RegExp(r'\bstatus[:=]\s*(\d+)').firstMatch(message) ??
+        RegExp(r'http status.*?(\\d+)').firstMatch(message.toLowerCase());
+    if (codeMatch != null) {
+      return int.tryParse(codeMatch.group(1) ?? '');
+    }
+    return null;
   }
 }

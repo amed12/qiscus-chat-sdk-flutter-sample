@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:qiscus_chat_flutter_sample/constants.dart';
 import 'package:qiscus_chat_flutter_sample/providers/auth_provider.dart';
-import 'package:qiscus_chat_flutter_sample/screens/home_screen.dart';
+import 'package:qiscus_chat_flutter_sample/screens/chat_room_screen.dart';
+import 'package:qiscus_chat_flutter_sample/services/multichannel_api.dart';
+import 'package:qiscus_chat_flutter_sample/services/qiscus_service.dart';
+import 'package:qiscus_chat_flutter_sample/services/session_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -16,6 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _userKeyController = TextEditingController();
   final _usernameController = TextEditingController();
   final _avatarUrlController = TextEditingController();
+  bool _isStartingChat = false;
 
   @override
   void dispose() {
@@ -26,42 +31,88 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    final authProvider = context.read<AuthProvider>();
-
-    final success = await authProvider.login(
-      userId: _userIdController.text.trim(),
-      userKey: _userKeyController.text.trim(),
-      username: _usernameController.text.trim().isEmpty
-          ? null
-          : _usernameController.text.trim(),
-      avatarUrl: _avatarUrlController.text.trim().isEmpty
-          ? null
-          : _avatarUrlController.text.trim(),
-    );
-
-    if (!mounted) return;
-
-    if (success) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.error ?? 'Login failed'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
   void _fillDemoCredentials() {
     _userIdController.text = 'demo-user-${DateTime.now().millisecondsSinceEpoch}';
     _userKeyController.text = 'demo-password';
     _usernameController.text = 'Demo User';
+  }
+
+  Future<void> _startMultichannelChat() async {
+    final userId = _userIdController.text.trim().isEmpty
+        ? 'guest-${DateTime.now().millisecondsSinceEpoch}'
+        : _userIdController.text.trim();
+    final displayName = _usernameController.text.trim().isEmpty
+        ? userId
+        : _usernameController.text.trim();
+    final avatar = _avatarUrlController.text.trim().isEmpty
+        ? null
+        : _avatarUrlController.text.trim();
+
+    setState(() => _isStartingChat = true);
+
+    try {
+      final messenger = ScaffoldMessenger.of(context);
+      final result = await MultichannelAPI.initiateChat(
+        appId: APP_ID,
+        channelId: CHANNEL_ID,
+        userId: userId,
+        name: displayName,
+        avatar: avatar,
+      );
+
+      final identityToken = result['identity_token'] as String?;
+      final customerRoom =
+          (result['customer_room'] ?? {}) as Map<String, dynamic>;
+      final roomId = int.tryParse('${customerRoom['room_id']}');
+      final isResolved = customerRoom['is_resolved'] == true;
+      final isSessional = await MultichannelAPI.checkSessional(APP_ID);
+
+      if (identityToken == null || roomId == null) {
+        throw Exception('Multichannel response is incomplete');
+      }
+
+      await SessionService.saveSession({
+        'appId': APP_ID,
+        'userId': userId,
+        'userDataToken': identityToken,
+        'roomId': roomId,
+        'isSessional': isSessional,
+        'isResolved': isResolved,
+      });
+
+      if (!mounted) return;
+      final authProvider = context.read<AuthProvider>();
+      final success =
+          await authProvider.loginWithToken(token: identityToken);
+      if (!success) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(authProvider.error ??
+                'Failed to start chat session, please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      final room = await QiscusService.instance.getChatRoomById(roomId);
+
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => ChatRoomScreen(room: room)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isStartingChat = false);
+      }
+    }
   }
 
   @override
@@ -156,7 +207,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Consumer<AuthProvider>(
                   builder: (context, authProvider, _) {
                     return ElevatedButton(
-                      onPressed: authProvider.isLoading ? null : _handleLogin,
+                      onPressed: authProvider.isLoading ? null : _startMultichannelChat,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
@@ -193,6 +244,36 @@ class _LoginScreenState extends State<LoginScreen> {
                     'Use Demo Credentials',
                     style: TextStyle(fontSize: 16),
                   ),
+                ),
+                const SizedBox(height: 12),
+                Consumer<AuthProvider>(
+                  builder: (context, authProvider, _) {
+                    return ElevatedButton.icon(
+                      onPressed: (authProvider.isLoading || _isStartingChat)
+                          ? null
+                          : _startMultichannelChat,
+                      icon: _isStartingChat
+                          ? const SizedBox(
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Icon(Icons.chat_bubble),
+                      label: Text(
+                        _isStartingChat
+                            ? 'Starting Multichannel...'
+                            : 'Start Multichannel Chat',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 24),
                 const Divider(),

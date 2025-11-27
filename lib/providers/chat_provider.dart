@@ -7,6 +7,7 @@ import 'package:qiscus_chat_flutter_sample/services/qiscus_service.dart';
 class ChatProvider with ChangeNotifier {
   final QiscusService _qiscusService = QiscusService.instance;
 
+  ChatConnectionStatus _connectionStatus = ChatConnectionStatus.connected;
   List<QChatRoom> _chatRooms = [];
   QChatRoom? _currentRoom;
   List<QMessage> _messages = [];
@@ -14,10 +15,10 @@ class ChatProvider with ChangeNotifier {
   bool _isLoadingMore = false;
   String? _error;
   Map<String, bool> _typingUsers = {};
-  Map<String, bool> _onlineUsers = {};
+  final Map<String, bool> _onlineUsers = {};
   int _unreadCount = 0;
   // Track upload progress for each message (uniqueId -> progress percentage)
-  Map<String, int> _uploadProgress = {};
+  final Map<String, int> _uploadProgress = {};
 
   List<QChatRoom> get chatRooms => _chatRooms;
   QChatRoom? get currentRoom => _currentRoom;
@@ -29,6 +30,7 @@ class ChatProvider with ChangeNotifier {
   Map<String, bool> get onlineUsers => _onlineUsers;
   int get unreadCount => _unreadCount;
   Map<String, int> get uploadProgress => _uploadProgress;
+  ChatConnectionStatus get connectionStatus => _connectionStatus;
   
   /// Get upload progress for a specific message
   int getUploadProgress(String messageUniqueId) {
@@ -39,17 +41,17 @@ class ChatProvider with ChangeNotifier {
   StreamSubscription? _messageDeliveredSub;
   StreamSubscription? _messageReadSub;
   StreamSubscription? _messageDeletedSub;
+  StreamSubscription? _messageUpdatedSub;
   StreamSubscription? _userTypingSub;
   StreamSubscription? _userPresenceSub;
+  StreamSubscription? _roomClearedSub;
+  StreamSubscription? _connectedSub;
+  StreamSubscription? _disconnectedSub;
 
   ChatProvider() {
-    _setupEventListeners();
-  }
-
-  /// Setup real-time event listeners
-  void _setupEventListeners() {
-    // Listen to new messages
-    _messageReceivedSub = _qiscusService.onMessageReceived.listen((message) {
+    _messageReceivedSub =
+        _qiscusService.sdk.onMessageReceived().listen((message) {
+      debugPrint('📨 Message received provider: ${message.text}');
       if (_currentRoom != null && message.chatRoomId == _currentRoom!.id) {
         _addMessage(message);
         // Auto mark as read
@@ -62,22 +64,24 @@ class ChatProvider with ChangeNotifier {
     });
 
     // Listen to message delivered
-    _messageDeliveredSub = _qiscusService.onMessageDelivered.listen((message) {
+    _messageDeliveredSub =
+        _qiscusService.sdk.onMessageDelivered().listen((message) {
       _updateMessageStatus(message);
     });
 
     // Listen to message read
-    _messageReadSub = _qiscusService.onMessageRead.listen((message) {
+    _messageReadSub = _qiscusService.sdk.onMessageRead().listen((message) {
       _updateMessageStatus(message);
     });
 
     // Listen to deleted messages
-    _messageDeletedSub = _qiscusService.onMessageDeleted.listen((message) {
+    _messageDeletedSub =
+        _qiscusService.sdk.onMessageDeleted().listen((message) {
       _removeMessage(message);
     });
 
     // Listen to typing indicator
-    _userTypingSub = _qiscusService.onUserTyping.listen((typing) {
+    _userTypingSub = _qiscusService.sdk.onUserTyping().listen((typing) {
       if (_currentRoom != null && typing.roomId == _currentRoom!.id) {
         _typingUsers[typing.userId] = typing.isTyping;
         notifyListeners();
@@ -85,9 +89,31 @@ class ChatProvider with ChangeNotifier {
     });
 
     // Listen to user presence
-    _userPresenceSub = _qiscusService.onUserPresence.listen((presence) {
+    _userPresenceSub =
+        _qiscusService.sdk.onUserOnlinePresence().listen((presence) {
       _onlineUsers[presence.userId] = presence.isOnline;
       notifyListeners();
+    });
+
+    // Listen to message updates (edits/status changes from server)
+    _messageUpdatedSub =
+        _qiscusService.sdk.onMessageUpdated().listen(_updateMessageStatus);
+
+    // Listen when a room is cleared from another device/session
+    _roomClearedSub =
+        _qiscusService.sdk.onChatRoomCleared().listen((roomId) {
+      if (_currentRoom != null && _currentRoom!.id == roomId) {
+        _messages = [];
+        notifyListeners();
+      }
+    });
+
+    // Basic connection awareness for UI
+    _connectedSub = _qiscusService.sdk.onConnected().listen((_) {
+      _setConnectionStatus(ChatConnectionStatus.connected);
+    });
+    _disconnectedSub = _qiscusService.sdk.onDisconnected().listen((_) {
+      _setConnectionStatus(ChatConnectionStatus.disconnected);
     });
   }
 
@@ -235,10 +261,12 @@ class ChatProvider with ChangeNotifier {
     if (_currentRoom == null || text.trim().isEmpty) return;
 
     try {
+      // Send message to server
       await _qiscusService.sendMessage(
         chatRoomId: _currentRoom!.id,
         text: text,
       );
+      _qiscusService.sdk.synchronize();
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -278,12 +306,12 @@ class ChatProvider with ChangeNotifier {
             // Remove from upload progress tracking
             _uploadProgress.remove(placeholderMessage.uniqueId);
             notifyListeners();
-            print('✅ File uploaded: ${uploadedMessage.text}');
+            debugPrint('✅ File uploaded: ${uploadedMessage.text}');
           } else {
             // Update upload progress
             _uploadProgress[placeholderMessage.uniqueId] = progress.progress.toInt();
             notifyListeners();
-            print('📤 Upload progress: ${progress.progress}%');
+            debugPrint('📤 Upload progress: ${progress.progress}%');
           }
         },
         onError: (error) {
@@ -292,13 +320,13 @@ class ChatProvider with ChangeNotifier {
           _uploadProgress.remove(placeholderMessage.uniqueId);
           _error = 'Failed to upload file: $error';
           notifyListeners();
-          print('❌ Upload failed: $error');
+          debugPrint('❌ Upload failed: $error');
         },
       );
     } catch (e) {
       _error = e.toString();
       notifyListeners();
-      print('❌ Error: $e');
+      debugPrint('❌ Error: $e');
     }
   }
 
@@ -314,9 +342,9 @@ class ChatProvider with ChangeNotifier {
       ).listen(
         (progress) {
           if (progress.data != null) {
-            print('File uploaded: ${progress.data!.text}');
+            debugPrint('File uploaded: ${progress.data!.text}');
           } else {
-            print('Upload progress: ${progress.progress}%');
+            debugPrint('Upload progress: ${progress.progress}%');
           }
         },
         onError: (error) {
@@ -387,7 +415,7 @@ class ChatProvider with ChangeNotifier {
         isTyping: isTyping,
       );
     } catch (e) {
-      print('Error publishing typing: $e');
+      debugPrint('Error publishing typing: $e');
     }
   }
 
@@ -462,15 +490,18 @@ class ChatProvider with ChangeNotifier {
       _unreadCount = await _qiscusService.getTotalUnreadCount();
       notifyListeners();
     } catch (e) {
-      print('Error updating unread count: $e');
+      debugPrint('Error updating unread count: $e');
     }
   }
 
-  /// Add message to list
+  /// Add or update message to list
   void _addMessage(QMessage message) {
     final index = _messages.indexWhere((m) => m.id == message.id);
     if (index == -1) {
       _messages.add(message);
+      notifyListeners();
+    } else {
+      _messages[index] = message;
       notifyListeners();
     }
   }
@@ -518,8 +549,21 @@ class ChatProvider with ChangeNotifier {
     _messageDeliveredSub?.cancel();
     _messageReadSub?.cancel();
     _messageDeletedSub?.cancel();
+    _messageUpdatedSub?.cancel();
     _userTypingSub?.cancel();
     _userPresenceSub?.cancel();
+    _roomClearedSub?.cancel();
+    _connectedSub?.cancel();
+    _disconnectedSub?.cancel();
     super.dispose();
   }
+
+  void _setConnectionStatus(ChatConnectionStatus status) {
+    if (_connectionStatus != status) {
+      _connectionStatus = status;
+      notifyListeners();
+    }
+  }
 }
+
+enum ChatConnectionStatus { connected, disconnected }

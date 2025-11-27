@@ -16,6 +16,7 @@ dependencies:
   
   # State Management
   provider: ^6.0.5
+  http: ^1.1.0
   
   # UI Components
   cupertino_icons: ^1.0.2
@@ -32,6 +33,7 @@ dependencies:
   # Firebase (optional - for push notifications)
   firebase_core: ^2.24.2
   firebase_messaging: ^14.7.9
+  flutter_local_notifications: ^17.2.1
   
   # Additional utilities from original
   timeago: ^3.3.0

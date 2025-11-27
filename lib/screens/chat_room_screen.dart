@@ -168,6 +168,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           PopupMenuButton<String>(
             onSelected: (value) async {
               if (value == 'clear') {
+                final chatProvider = context.read<ChatProvider>();
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
@@ -188,10 +189,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   ),
                 );
 
+                if (!mounted) return;
                 if (confirm == true) {
-                  if (mounted) {
-                    await context.read<ChatProvider>().clearMessages();
-                  }
+                  await chatProvider.clearMessages();
                 }
               } else if (value == 'participants') {
                 _showParticipants();
@@ -213,6 +213,30 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       ),
       body: Column(
         children: [
+          Consumer<ChatProvider>(
+            builder: (context, chatProvider, _) {
+              if (chatProvider.connectionStatus ==
+                  ChatConnectionStatus.connected) {
+                return const SizedBox.shrink();
+              }
+              return Container(
+                width: double.infinity,
+                color: Colors.orange.shade100,
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.wifi_off, size: 16, color: Colors.orange),
+                    SizedBox(width: 8),
+                    Text(
+                      'Reconnecting... Please check your connection',
+                      style: TextStyle(color: Colors.orange),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
           Expanded(
             child: Consumer<ChatProvider>(
               builder: (context, chatProvider, _) {

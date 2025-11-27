@@ -1,7 +1,7 @@
-import 'dart:async';
 import 'dart:io';
 import 'package:flutter/rendering.dart';
 import 'package:qiscus_chat_sdk/qiscus_chat_sdk.dart';
+import 'package:qiscus_chat_flutter_sample/constants.dart';
 
 /// Singleton service to manage Qiscus SDK
 class QiscusService {
@@ -12,46 +12,22 @@ class QiscusService {
   QiscusSDK? _sdk;
   QiscusSDK get sdk => _sdk ?? QiscusSDK.instance;
 
-  // Stream controllers for real-time events
-  final StreamController<QMessage> _messageReceivedController =
-      StreamController<QMessage>.broadcast();
-  final StreamController<QMessage> _messageDeliveredController =
-      StreamController<QMessage>.broadcast();
-  final StreamController<QMessage> _messageReadController =
-      StreamController<QMessage>.broadcast();
-  final StreamController<QMessage> _messageDeletedController =
-      StreamController<QMessage>.broadcast();
-  final StreamController<QUserTyping> _userTypingController =
-      StreamController<QUserTyping>.broadcast();
-  final StreamController<QUserPresence> _userPresenceController =
-      StreamController<QUserPresence>.broadcast();
-
-  // Streams
-  Stream<QMessage> get onMessageReceived => _messageReceivedController.stream;
-  Stream<QMessage> get onMessageDelivered => _messageDeliveredController.stream;
-  Stream<QMessage> get onMessageRead => _messageReadController.stream;
-  Stream<QMessage> get onMessageDeleted => _messageDeletedController.stream;
-  Stream<QUserTyping> get onUserTyping => _userTypingController.stream;
-  Stream<QUserPresence> get onUserPresence => _userPresenceController.stream;
-
   /// Initialize Qiscus SDK
   /// Replace 'YOUR_APP_ID' with your actual Qiscus App ID
   Future<void> initialize() async {
     try {
-      const appId = 'qchatsdk--y4ebyzbysjz';
+      const appId = APP_ID;
       debugPrint('🚀 Initializing Qiscus SDK with APP_ID: $appId');
       
       if (appId == 'YOUR_APP_ID') {
         throw Exception('Please replace YOUR_APP_ID with your actual Qiscus App ID in qiscus_service.dart');
       }
       
+      _sdk = QiscusSDK.instance;
       await sdk.setup(appId);
       
       // Enable debug mode for development
       sdk.enableDebugMode(enable: true, level: QLogLevel.verbose);
-      
-      // Setup event listeners
-      _setupEventListeners();
       
       debugPrint('✅ Qiscus SDK initialized successfully');
     } on TypeError catch (e, stackTrace) {
@@ -63,58 +39,6 @@ class QiscusService {
       debugPrint('Stack trace: $stackTrace');
       rethrow;
     }
-  }
-
-  /// Setup event listeners for real-time updates
-  void _setupEventListeners() {
-    // Listen to new messages
-    sdk.onMessageReceived().listen((message) {
-      debugPrint('📨 Message received: ${message.text}');
-      _messageReceivedController.add(message);
-    });
-
-    // Listen to message delivered status
-    sdk.onMessageDelivered().listen((message) {
-      debugPrint('✓ Message delivered: ${message.id}');
-      _messageDeliveredController.add(message);
-    });
-
-    // Listen to message read status
-    sdk.onMessageRead().listen((message) {
-      debugPrint('✓✓ Message read: ${message.id}');
-      _messageReadController.add(message);
-    });
-
-    // Listen to deleted messages
-    sdk.onMessageDeleted().listen((message) {
-      debugPrint('🗑️ Message deleted: ${message.id}');
-      _messageDeletedController.add(message);
-    });
-
-    // Listen to user typing
-    sdk.onUserTyping().listen((typing) {
-      debugPrint('⌨️ User typing: ${typing.userId}');
-      _userTypingController.add(typing);
-    });
-
-    // Listen to user presence
-    sdk.onUserOnlinePresence().listen((presence) {
-      debugPrint('👤 User presence: ${presence.userId} - ${presence.isOnline}');
-      _userPresenceController.add(presence);
-    });
-
-    // Listen to connection status
-    sdk.onConnected().listen((_) {
-      debugPrint('🟢 Connected to Qiscus');
-    });
-
-    sdk.onDisconnected().listen((_) {
-      debugPrint('🔴 Disconnected from Qiscus');
-    });
-
-    sdk.onReconnecting().listen((_) {
-      debugPrint('🟡 Reconnecting to Qiscus...');
-    });
   }
 
   /// Login user with userId and userKey
@@ -428,38 +352,6 @@ class QiscusService {
     }
   }
 
-  /// Load next messages
-  Future<List<QMessage>> loadNextMessages({
-    required int roomId,
-    required int messageId,
-    int? limit,
-  }) async {
-    try {
-      final messages = await sdk.getNextMessagesById(
-        roomId: roomId,
-        messageId: messageId,
-        limit: limit,
-      );
-      debugPrint('✅ Loaded ${messages.length} next messages');
-      return messages;
-    } catch (e) {
-      debugPrint('❌ Load next messages failed: $e');
-      rethrow;
-    }
-  }
-
-  /// Mark message as delivered
-  Future<void> markAsDelivered({
-    required int roomId,
-    required int messageId,
-  }) async {
-    try {
-      await sdk.markAsDelivered(roomId: roomId, messageId: messageId);
-    } catch (e) {
-      debugPrint('❌ Mark as delivered failed: $e');
-    }
-  }
-
   /// Mark message as read
   Future<void> markAsRead({
     required int roomId,
@@ -494,27 +386,6 @@ class QiscusService {
     } catch (e) {
       debugPrint('❌ Publish typing failed: $e');
     }
-  }
-
-  /// Publish online presence
-  Future<void> publishOnlinePresence({required bool isOnline}) async {
-    try {
-      await sdk.publishOnlinePresence(isOnline: isOnline);
-    } catch (e) {
-      debugPrint('❌ Publish online presence failed: $e');
-    }
-  }
-
-  /// Subscribe to user online presence
-  void subscribeUserOnlinePresence(String userId) {
-    sdk.subscribeUserOnlinePresence(userId);
-    debugPrint('✅ Subscribed to user presence: $userId');
-  }
-
-  /// Unsubscribe from user online presence
-  void unsubscribeUserOnlinePresence(String userId) {
-    sdk.unsubscribeUserOnlinePresence(userId);
-    debugPrint('✅ Unsubscribed from user presence: $userId');
   }
 
   /// Add participants to group chat
@@ -585,42 +456,6 @@ class QiscusService {
     }
   }
 
-  /// Block user
-  Future<QUser> blockUser({required String userId}) async {
-    try {
-      final user = await sdk.blockUser(userId: userId);
-      debugPrint('✅ User blocked: $userId');
-      return user;
-    } catch (e) {
-      debugPrint('❌ Block user failed: $e');
-      rethrow;
-    }
-  }
-
-  /// Unblock user
-  Future<QUser> unblockUser({required String userId}) async {
-    try {
-      final user = await sdk.unblockUser(userId: userId);
-      debugPrint('✅ User unblocked: $userId');
-      return user;
-    } catch (e) {
-      debugPrint('❌ Unblock user failed: $e');
-      rethrow;
-    }
-  }
-
-  /// Get blocked users
-  Future<List<QUser>> getBlockedUsers({int? page, int? limit}) async {
-    try {
-      final users = await sdk.getBlockedUsers(page: page, limit: limit);
-      debugPrint('✅ Fetched ${users.length} blocked users');
-      return users;
-    } catch (e) {
-      debugPrint('❌ Get blocked users failed: $e');
-      rethrow;
-    }
-  }
-
   /// Clear messages in chat room
   Future<void> clearMessages({required List<String> roomUniqueIds}) async {
     try {
@@ -632,49 +467,8 @@ class QiscusService {
     }
   }
 
-  /// Register device token for push notifications
-  Future<bool> registerDeviceToken({
-    required String token,
-    bool? isDevelopment,
-  }) async {
-    try {
-      final result = await sdk.registerDeviceToken(
-        token: token,
-        isDevelopment: isDevelopment,
-      );
-      debugPrint('✅ Device token registered');
-      return result;
-    } catch (e) {
-      debugPrint('❌ Register device token failed: $e');
-      rethrow;
-    }
-  }
-
-  /// Remove device token
-  Future<bool> removeDeviceToken({
-    required String token,
-    bool? isDevelopment,
-  }) async {
-    try {
-      final result = await sdk.removeDeviceToken(
-        token: token,
-        isDevelopment: isDevelopment,
-      );
-      debugPrint('✅ Device token removed');
-      return result;
-    } catch (e) {
-      debugPrint('❌ Remove device token failed: $e');
-      rethrow;
-    }
-  }
-
-  /// Dispose resources
-  void dispose() {
-    _messageReceivedController.close();
-    _messageDeliveredController.close();
-    _messageReadController.close();
-    _messageDeletedController.close();
-    _userTypingController.close();
-    _userPresenceController.close();
+  /// Get JWT nonce for multichannel initiate_chat API
+  Future<String> getNonce() async {
+    return sdk.getJWTNonce();
   }
 }

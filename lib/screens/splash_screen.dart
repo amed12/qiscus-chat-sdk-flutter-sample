@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:qiscus_chat_flutter_sample/providers/auth_provider.dart';
+import 'package:qiscus_chat_flutter_sample/screens/resume_session_screen.dart';
 import 'package:qiscus_chat_flutter_sample/screens/login_screen.dart';
-import 'package:qiscus_chat_flutter_sample/screens/home_screen.dart';
+import 'package:qiscus_chat_flutter_sample/services/session_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -13,6 +14,7 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   bool _hasNavigated = false;
+  Map<String, dynamic>? _storedSession;
 
   @override
   void initState() {
@@ -27,6 +29,25 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     final authProvider = context.read<AuthProvider>();
+    final storedSession = await SessionService.loadSession();
+    _storedSession = storedSession;
+
+    if (storedSession != null && storedSession['userDataToken'] != null) {
+      final token = storedSession['userDataToken'] as String;
+      final loginSuccess = await authProvider.loginWithToken(token: token);
+      if (loginSuccess && mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => ResumeSessionScreen(session: storedSession),
+          ),
+        );
+        _hasNavigated = true;
+        return;
+      } else if (!loginSuccess) {
+        await SessionService.clearSession();
+        _storedSession = null;
+      }
+    }
     
     // Wait for auth provider to finish its initialization
     // Check periodically if login check is complete
@@ -63,7 +84,9 @@ class _SplashScreenState extends State<SplashScreen> {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => authProvider.isLoggedIn
-            ? const HomeScreen()
+            ? (_storedSession != null
+                ? ResumeSessionScreen(session: _storedSession!)
+                : const LoginScreen())
             : const LoginScreen(),
       ),
     );
@@ -83,10 +106,10 @@ class _SplashScreenState extends State<SplashScreen> {
             ],
           ),
         ),
-        child: Center(
+        child: const Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
+            children: [
               Icon(
                 Icons.chat_bubble_rounded,
                 size: 100,
