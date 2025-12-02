@@ -198,6 +198,24 @@ class ChatProvider with ChangeNotifier {
     }
   }
 
+  /// Send text message with extras (e.g., product info)
+  Future<void> sendMessageWithExtras(String text, Map<String, dynamic> extras) async {
+    if (_currentRoom == null || text.trim().isEmpty) return;
+
+    try {
+      // Send message to server with extras
+      await _qiscusService.sendMessage(
+        chatRoomId: _currentRoom!.id,
+        text: text,
+        extras: extras,
+      );
+      _qiscusService.sdk.synchronize();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+    }
+  }
+
   /// Send file message with placeholder (like JavaScript flow)
   Future<void> sendFileMessageWithPlaceholder(File file, {String? caption}) async {
     if (_currentRoom == null) return;

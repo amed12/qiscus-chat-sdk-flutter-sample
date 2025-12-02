@@ -24,6 +24,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final ImagePicker _imagePicker = ImagePicker();
   late ChatProvider _chatProvider;
 
+  // Product template state
+  bool _showProductTemplate = false;
+  final TextEditingController _productNameController = TextEditingController();
+  final TextEditingController _productPriceController = TextEditingController();
+  final TextEditingController _productCodeController = TextEditingController();
+  final TextEditingController _productImageController = TextEditingController();
+  final TextEditingController _productLinkController = TextEditingController();
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -47,6 +55,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _productNameController.dispose();
+    _productPriceController.dispose();
+    _productCodeController.dispose();
+    _productImageController.dispose();
+    _productLinkController.dispose();
     // Use saved reference instead of context.read()
     _chatProvider.leaveChatRoom(notify: false);
     super.dispose();
@@ -304,6 +317,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 },
               ),
             ),
+            if (_showProductTemplate) _buildProductTemplate(),
             _buildMessageInput(),
           ],
         ),
@@ -341,6 +355,176 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         false;
   }
 
+  Widget _buildProductTemplate() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Product Template',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.blue,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onPressed: () {
+                  setState(() {
+                    _showProductTemplate = false;
+                  });
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildTemplateTextField(
+            controller: _productNameController,
+            label: 'Product Name',
+            hint: 'Enter product name',
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildTemplateTextField(
+                  controller: _productCodeController,
+                  label: 'Product Code',
+                  hint: 'Code',
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildTemplateTextField(
+                  controller: _productPriceController,
+                  label: 'Price',
+                  hint: 'Price',
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildTemplateTextField(
+            controller: _productImageController,
+            label: 'Image URL',
+            hint: 'Enter image URL',
+          ),
+          const SizedBox(height: 8),
+          _buildTemplateTextField(
+            controller: _productLinkController,
+            label: 'Product Link',
+            hint: 'Enter product link',
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _sendProductMessage,
+              icon: const Icon(Icons.send, size: 18),
+              label: const Text('Send Product'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTemplateTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    TextInputType? keyboardType,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Colors.blue),
+        ),
+        filled: true,
+        fillColor: Colors.white,
+      ),
+      style: const TextStyle(fontSize: 14),
+    );
+  }
+
+  Future<void> _sendProductMessage() async {
+    final productName = _productNameController.text.trim();
+    final productCode = int.tryParse(_productCodeController.text.trim()) ?? 0;
+    final productPrice = int.tryParse(_productPriceController.text.trim()) ?? 0;
+    final productImage = _productImageController.text.trim();
+    final productLink = _productLinkController.text.trim();
+
+    if (productName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter product name')),
+      );
+      return;
+    }
+
+    final text = '================== \n\n                LINK PRODUCT: $productLink\n             ';
+    final extras = {
+      'product_code': productCode,
+      'product_name': productName,
+      'product_price': productPrice,
+      'type': 'PRODUCT',
+      'product_image': productImage,
+      'product_link': productLink,
+    };
+
+    await context.read<ChatProvider>().sendMessageWithExtras(text, extras);
+
+    // Clear fields and hide template
+    _productNameController.clear();
+    _productCodeController.clear();
+    _productPriceController.clear();
+    _productImageController.clear();
+    _productLinkController.clear();
+    setState(() {
+      _showProductTemplate = false;
+    });
+
+    _scrollToBottom();
+  }
+
   Widget _buildMessageInput() {
     return Container(
       padding: const EdgeInsets.all(8.0),
@@ -359,6 +543,17 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           IconButton(
             icon: const Icon(Icons.attach_file),
             onPressed: _showAttachmentOptions,
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.shopping_bag_outlined,
+              color: _showProductTemplate ? Colors.blue : null,
+            ),
+            onPressed: () {
+              setState(() {
+                _showProductTemplate = !_showProductTemplate;
+              });
+            },
           ),
           Expanded(
             child: TextField(
