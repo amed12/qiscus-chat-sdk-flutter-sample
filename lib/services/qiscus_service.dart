@@ -25,6 +25,8 @@ class QiscusService {
       StreamController<QUserTyping>.broadcast();
   final StreamController<QUserPresence> _userPresenceController =
       StreamController<QUserPresence>.broadcast();
+  final StreamController<bool> _mqttConnectedController =
+      StreamController<bool>.broadcast();
 
   // Streams
   Stream<QMessage> get onMessageReceived => _messageReceivedController.stream;
@@ -33,6 +35,7 @@ class QiscusService {
   Stream<QMessage> get onMessageDeleted => _messageDeletedController.stream;
   Stream<QUserTyping> get onUserTyping => _userTypingController.stream;
   Stream<QUserPresence> get onUserPresence => _userPresenceController.stream;
+  Stream<bool> get onMqttConnected => _mqttConnectedController.stream;
 
   /// Initialize Qiscus SDK
   /// Replace 'YOUR_APP_ID' with your actual Qiscus App ID
@@ -105,15 +108,15 @@ class QiscusService {
 
     // Listen to connection status
     sdk.onConnected().listen((_) {
-      debugPrint('🟢 Connected to Qiscus');
+      _mqttConnectedController.add(true);
     });
 
     sdk.onDisconnected().listen((_) {
-      debugPrint('🔴 Disconnected from Qiscus');
+      _mqttConnectedController.add(false);
     });
 
     sdk.onReconnecting().listen((_) {
-      debugPrint('🟡 Reconnecting to Qiscus...');
+      _mqttConnectedController.add(false);
     });
   }
 
