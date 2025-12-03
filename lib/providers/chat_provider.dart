@@ -20,7 +20,7 @@ class ChatProvider with ChangeNotifier {
   // Track upload progress for each message (uniqueId -> progress percentage)
   final Map<String, int> _uploadProgress = {};
   bool _disposed = false;
-  bool _mqttConnected = false;
+  RealtimeStatus _realtimeStatus = RealtimeStatus.disconnected;
 
   List<QChatRoom> get chatRooms => _chatRooms;
   QChatRoom? get currentRoom => _currentRoom;
@@ -32,7 +32,7 @@ class ChatProvider with ChangeNotifier {
   Map<String, bool> get onlineUsers => _onlineUsers;
   int get unreadCount => _unreadCount;
   Map<String, int> get uploadProgress => _uploadProgress;
-  bool get mqttConnected => _mqttConnected;
+  RealtimeStatus get realtimeStatus => _realtimeStatus;
   /// Get upload progress for a specific message
   int getUploadProgress(String messageUniqueId) {
     return _uploadProgress[messageUniqueId] ?? 0;
@@ -44,7 +44,7 @@ class ChatProvider with ChangeNotifier {
   StreamSubscription? _messageDeletedSub;
   StreamSubscription? _userTypingSub;
   StreamSubscription? _userPresenceSub;
-  StreamSubscription? _mqttConnectedSub;
+  StreamSubscription? _realtimeStatusSub;
 
   ChatProvider() {
     _setupEventListeners();
@@ -101,9 +101,10 @@ class ChatProvider with ChangeNotifier {
       _notifySafely();
     });
 
-    // Listen to MQTT connection status
-    _mqttConnectedSub = _qiscusService.onMqttConnected.listen((connected) {
-      _mqttConnected = connected;
+    // Listen to realtime connection status
+    _realtimeStatusSub =
+        _qiscusService.onRealtimeStatus.listen((status) {
+      _realtimeStatus = status;
       _notifySafely();
     });
   }
@@ -637,7 +638,7 @@ class ChatProvider with ChangeNotifier {
     _messageDeletedSub?.cancel();
     _userTypingSub?.cancel();
     _userPresenceSub?.cancel();
-    _mqttConnectedSub?.cancel();
+    _realtimeStatusSub?.cancel();
     super.dispose();
   }
   

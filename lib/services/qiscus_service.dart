@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/rendering.dart';
 import 'package:qiscus_chat_sdk/qiscus_chat_sdk.dart';
 
+enum RealtimeStatus { connected, reconnecting, disconnected }
+
 /// Singleton service to manage Qiscus SDK
 class QiscusService {
   static final QiscusService instance = QiscusService._internal();
@@ -25,8 +27,8 @@ class QiscusService {
       StreamController<QUserTyping>.broadcast();
   final StreamController<QUserPresence> _userPresenceController =
       StreamController<QUserPresence>.broadcast();
-  final StreamController<bool> _mqttConnectedController =
-      StreamController<bool>.broadcast();
+  final StreamController<RealtimeStatus> _realtimeStatusController =
+      StreamController<RealtimeStatus>.broadcast();
 
   // Streams
   Stream<QMessage> get onMessageReceived => _messageReceivedController.stream;
@@ -35,7 +37,8 @@ class QiscusService {
   Stream<QMessage> get onMessageDeleted => _messageDeletedController.stream;
   Stream<QUserTyping> get onUserTyping => _userTypingController.stream;
   Stream<QUserPresence> get onUserPresence => _userPresenceController.stream;
-  Stream<bool> get onMqttConnected => _mqttConnectedController.stream;
+  Stream<RealtimeStatus> get onRealtimeStatus =>
+      _realtimeStatusController.stream;
 
   /// Initialize Qiscus SDK
   /// Replace 'YOUR_APP_ID' with your actual Qiscus App ID
@@ -108,15 +111,15 @@ class QiscusService {
 
     // Listen to connection status
     sdk.onConnected().listen((_) {
-      _mqttConnectedController.add(true);
+      _realtimeStatusController.add(RealtimeStatus.connected);
     });
 
     sdk.onDisconnected().listen((_) {
-      _mqttConnectedController.add(false);
+      _realtimeStatusController.add(RealtimeStatus.disconnected);
     });
 
     sdk.onReconnecting().listen((_) {
-      _mqttConnectedController.add(false);
+      _realtimeStatusController.add(RealtimeStatus.reconnecting);
     });
   }
 
@@ -684,5 +687,6 @@ class QiscusService {
     _messageDeletedController.close();
     _userTypingController.close();
     _userPresenceController.close();
+    _realtimeStatusController.close();
   }
 }
