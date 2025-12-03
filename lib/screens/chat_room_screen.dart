@@ -196,6 +196,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   );
                 }
 
+                if (widget.room.type != QRoomType.single) {
+                  return const SizedBox.shrink();
+                }
+
                 return Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
