@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:qiscus_chat_sdk/qiscus_chat_sdk.dart';
 import 'package:qiscus_chat_flutter_sample/services/qiscus_service.dart';
 
@@ -13,11 +14,12 @@ class ChatProvider with ChangeNotifier {
   bool _isLoading = false;
   bool _isLoadingMore = false;
   String? _error;
-  Map<String, bool> _typingUsers = {};
-  Map<String, bool> _onlineUsers = {};
+  final Map<String, bool> _typingUsers = {};
+  final Map<String, bool> _onlineUsers = {};
   int _unreadCount = 0;
   // Track upload progress for each message (uniqueId -> progress percentage)
-  Map<String, int> _uploadProgress = {};
+  final Map<String, int> _uploadProgress = {};
+  bool _disposed = false;
 
   List<QChatRoom> get chatRooms => _chatRooms;
   QChatRoom? get currentRoom => _currentRoom;
@@ -50,14 +52,21 @@ class ChatProvider with ChangeNotifier {
   void _setupEventListeners() {
     // Listen to new messages
     _messageReceivedSub = _qiscusService.onMessageReceived.listen((message) {
-      if (_currentRoom != null && message.chatRoomId == _currentRoom!.id) {
+      final isCurrentRoom =
+          _currentRoom != null && message.chatRoomId == _currentRoom!.id;
+
+      if (isCurrentRoom) {
         _addMessage(message);
         // Auto mark as read
-        _qiscusService.markAsRead(
-          roomId: message.chatRoomId,
-          messageId: message.id,
-        );
+        if (message.sender.id != _qiscusService.sdk.currentUser?.id && message.status == QMessageStatus.delivered) {
+          _qiscusService.markAsRead(
+            roomId: message.chatRoomId,
+            messageId: message.id,
+          );
+        }
       }
+
+      _updateRoomFromMessage(message, isCurrentRoom: isCurrentRoom);
       _updateUnreadCount();
     });
 
@@ -80,14 +89,14 @@ class ChatProvider with ChangeNotifier {
     _userTypingSub = _qiscusService.onUserTyping.listen((typing) {
       if (_currentRoom != null && typing.roomId == _currentRoom!.id) {
         _typingUsers[typing.userId] = typing.isTyping;
-        notifyListeners();
+        _notifySafely();
       }
     });
 
     // Listen to user presence
     _userPresenceSub = _qiscusService.onUserPresence.listen((presence) {
       _onlineUsers[presence.userId] = presence.isOnline;
-      notifyListeners();
+      _notifySafely();
     });
   }
 
@@ -108,6 +117,7 @@ class ChatProvider with ChangeNotifier {
       );
 
       _chatRooms = rooms;
+      _sortRoomsByLastMessage();
       _setLoading(false);
       await _updateUnreadCount();
     } catch (e) {
@@ -190,6 +200,37 @@ class ChatProvider with ChangeNotifier {
     }
   }
 
+  /// Refresh a specific room (e.g., after returning from chat room)
+  Future<void> refreshRoom(int roomId) async {
+    try {
+      final room = await _qiscusService.getChatRoomById(roomId);
+      _upsertRoom(room);
+    } catch (e) {
+      _error = e.toString();
+      _notifySafely();
+    }
+  }
+
+  /// Update room from message
+  /// This method updates the room's last message and unread count
+  void _updateRoomFromMessage(QMessage message, {required bool isCurrentRoom}) {
+    final index = _chatRooms.indexWhere((r) => r.id == message.chatRoomId);
+    if (index == -1) return;
+
+    final room = _chatRooms[index];
+    room.lastMessage = message;
+
+    if (isCurrentRoom) {
+      room.unreadCount = 0;
+    } else {
+      room.unreadCount = (room.unreadCount) + 1;
+    }
+
+    _chatRooms[index] = room;
+    _sortRoomsByLastMessage();
+    _notifySafely();
+  }
+
   /// Enter chat room
   Future<void> enterChatRoom(QChatRoom room) async {
     _setLoading(true);
@@ -200,9 +241,13 @@ class ChatProvider with ChangeNotifier {
       // Subscribe to room for real-time updates
       _qiscusService.subscribeChatRoom(room);
 
+      // Sync missed messages/events before fetching current room data
+      await synchronizeMessages();
+
       // Load messages
       final data = await _qiscusService.getChatRoomWithMessages(roomId: room.id);
       _messages = data.messages.reversed.toList();
+      _notifySafely(); // ensure listeners (UI) know messages are ready
 
       // Mark last message as read
       if (_messages.isNotEmpty) {
@@ -212,6 +257,7 @@ class ChatProvider with ChangeNotifier {
         );
       }
 
+      await refreshRoom(room.id);
       _setLoading(false);
     } catch (e) {
       _error = e.toString();
@@ -224,9 +270,13 @@ class ChatProvider with ChangeNotifier {
     if (_currentRoom != null) {
       _qiscusService.unsubscribeChatRoom(_currentRoom!);
       _currentRoom = null;
-      _messages = [];
-      _typingUsers = {};
-      notifyListeners();
+      _messages.clear();
+      _typingUsers.clear();
+      _onlineUsers.clear();
+      _unreadCount = 0;
+      _uploadProgress.clear();
+      _error = null;
+      _notifySafely();
     }
   }
 
@@ -235,13 +285,14 @@ class ChatProvider with ChangeNotifier {
     if (_currentRoom == null || text.trim().isEmpty) return;
 
     try {
-      await _qiscusService.sendMessage(
+      final message = await _qiscusService.sendMessage(
         chatRoomId: _currentRoom!.id,
         text: text,
       );
+      _addMessage(message);
     } catch (e) {
       _error = e.toString();
-      notifyListeners();
+      _notifySafely();
     }
   }
 
@@ -277,12 +328,12 @@ class ChatProvider with ChangeNotifier {
             _updateMessageInList(placeholderMessage, uploadedMessage);
             // Remove from upload progress tracking
             _uploadProgress.remove(placeholderMessage.uniqueId);
-            notifyListeners();
+            _notifySafely();
             print('✅ File uploaded: ${uploadedMessage.text}');
           } else {
             // Update upload progress
             _uploadProgress[placeholderMessage.uniqueId] = progress.progress.toInt();
-            notifyListeners();
+            _notifySafely();
             print('📤 Upload progress: ${progress.progress}%');
           }
         },
@@ -291,13 +342,13 @@ class ChatProvider with ChangeNotifier {
           _removeMessage(placeholderMessage);
           _uploadProgress.remove(placeholderMessage.uniqueId);
           _error = 'Failed to upload file: $error';
-          notifyListeners();
+          _notifySafely();
           print('❌ Upload failed: $error');
         },
       );
     } catch (e) {
       _error = e.toString();
-      notifyListeners();
+      _notifySafely();
       print('❌ Error: $e');
     }
   }
@@ -321,12 +372,12 @@ class ChatProvider with ChangeNotifier {
         },
         onError: (error) {
           _error = error.toString();
-          notifyListeners();
+          _notifySafely();
         },
       );
     } catch (e) {
       _error = e.toString();
-      notifyListeners();
+      _notifySafely();
     }
   }
 
@@ -339,7 +390,7 @@ class ChatProvider with ChangeNotifier {
       );
     } catch (e) {
       _error = e.toString();
-      notifyListeners();
+      _notifySafely();
     }
   }
 
@@ -349,7 +400,7 @@ class ChatProvider with ChangeNotifier {
       await _qiscusService.deleteMessages(messageUniqueIds: messageUniqueIds);
     } catch (e) {
       _error = e.toString();
-      notifyListeners();
+      _notifySafely();
     }
   }
 
@@ -358,7 +409,7 @@ class ChatProvider with ChangeNotifier {
     if (_currentRoom == null || _messages.isEmpty || _isLoadingMore) return;
 
     _isLoadingMore = true;
-    notifyListeners();
+    _notifySafely();
 
     try {
       final oldMessages = await _qiscusService.loadPreviousMessages(
@@ -369,11 +420,23 @@ class ChatProvider with ChangeNotifier {
 
       _messages.insertAll(0, oldMessages.reversed);
       _isLoadingMore = false;
-      notifyListeners();
+      _notifySafely();
     } catch (e) {
       _error = e.toString();
       _isLoadingMore = false;
-      notifyListeners();
+      _notifySafely();
+    }
+  }
+
+  /// Manually trigger SDK synchronize to fetch missed messages/events
+  Future<void> synchronizeMessages() async {
+    try {
+      // Use last local message as a hint; SDK will manage its own cursor
+      final lastId = _messages.isNotEmpty ? _messages.last.id.toString() : null;
+      _qiscusService.sdk.synchronize(lastMessageId: lastId);
+    } catch (e) {
+      _error = e.toString();
+      _notifySafely();
     }
   }
 
@@ -403,7 +466,7 @@ class ChatProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _error = e.toString();
-      notifyListeners();
+      _notifySafely();
       return false;
     }
   }
@@ -420,7 +483,7 @@ class ChatProvider with ChangeNotifier {
       return true;
     } catch (e) {
       _error = e.toString();
-      notifyListeners();
+      _notifySafely();
       return false;
     }
   }
@@ -435,7 +498,7 @@ class ChatProvider with ChangeNotifier {
       );
     } catch (e) {
       _error = e.toString();
-      notifyListeners();
+      _notifySafely();
       return [];
     }
   }
@@ -449,10 +512,10 @@ class ChatProvider with ChangeNotifier {
         roomUniqueIds: [_currentRoom!.uniqueId],
       );
       _messages = [];
-      notifyListeners();
+      _notifySafely();
     } catch (e) {
       _error = e.toString();
-      notifyListeners();
+      _notifySafely();
     }
   }
 
@@ -460,7 +523,7 @@ class ChatProvider with ChangeNotifier {
   Future<void> _updateUnreadCount() async {
     try {
       _unreadCount = await _qiscusService.getTotalUnreadCount();
-      notifyListeners();
+      _notifySafely();
     } catch (e) {
       print('Error updating unread count: $e');
     }
@@ -471,7 +534,7 @@ class ChatProvider with ChangeNotifier {
     final index = _messages.indexWhere((m) => m.id == message.id);
     if (index == -1) {
       _messages.add(message);
-      notifyListeners();
+      _notifySafely();
     }
   }
 
@@ -480,7 +543,7 @@ class ChatProvider with ChangeNotifier {
     final index = _messages.indexWhere((m) => m.id == message.id);
     if (index != -1) {
       _messages[index] = message;
-      notifyListeners();
+      _notifySafely();
     }
   }
 
@@ -489,7 +552,7 @@ class ChatProvider with ChangeNotifier {
     final index = _messages.indexWhere((m) => m.uniqueId == oldMessage.uniqueId);
     if (index != -1) {
       _messages[index] = newMessage;
-      notifyListeners();
+      _notifySafely();
     } else {
       // If not found by uniqueId, try to find by text and add new message
       _addMessage(newMessage);
@@ -499,21 +562,56 @@ class ChatProvider with ChangeNotifier {
   /// Remove message from list
   void _removeMessage(QMessage message) {
     _messages.removeWhere((m) => m.id == message.id);
-    notifyListeners();
+    _notifySafely();
   }
 
   void _setLoading(bool value) {
     _isLoading = value;
-    notifyListeners();
+    _notifySafely();
   }
 
   void clearError() {
     _error = null;
-    notifyListeners();
+    _notifySafely();
+  }
+
+
+  void _upsertRoom(QChatRoom room) {
+    final index = _chatRooms.indexWhere((r) => r.id == room.id);
+    if (index == -1) {
+      _chatRooms.insert(0, room);
+    } else {
+      _chatRooms[index] = room;
+    }
+    _sortRoomsByLastMessage();
+    _notifySafely();
+  }
+
+  void _sortRoomsByLastMessage() {
+    _chatRooms.sort((a, b) {
+      final aTime = a.lastMessage?.timestamp ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bTime = b.lastMessage?.timestamp ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bTime.compareTo(aTime);
+    });
+  }
+
+  void _notifySafely() {
+    if (_disposed) return;
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.idle) {
+      super.notifyListeners();
+    } else {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (!_disposed) {
+          super.notifyListeners();
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _messageReceivedSub?.cancel();
     _messageDeliveredSub?.cancel();
     _messageReadSub?.cancel();
@@ -522,4 +620,5 @@ class ChatProvider with ChangeNotifier {
     _userPresenceSub?.cancel();
     super.dispose();
   }
+  
 }

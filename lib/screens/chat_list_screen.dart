@@ -6,8 +6,22 @@ import 'package:qiscus_chat_flutter_sample/providers/chat_provider.dart';
 import 'package:qiscus_chat_flutter_sample/screens/chat_room_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
-class ChatListScreen extends StatelessWidget {
+class ChatListScreen extends StatefulWidget {
   const ChatListScreen({Key? key}) : super(key: key);
+
+  @override
+  State<ChatListScreen> createState() => _ChatListScreenState();
+}
+
+class _ChatListScreenState extends State<ChatListScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final chatProvider = context.read<ChatProvider>();
+      chatProvider.loadChatRooms();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

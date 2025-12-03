@@ -228,7 +228,12 @@ class QiscusService {
     try {
       debugPrint('📥 Loading chat room: $roomId');
       final roomWithMessages = await sdk.getChatRoomWithMessages(roomId: roomId);
-      
+
+      // Ensure lastMessage is populated from fetched messages
+      if (roomWithMessages.messages.isNotEmpty) {
+        roomWithMessages.room.lastMessage = roomWithMessages.messages.last;
+      }
+
       debugPrint('✅ Chat room loaded: ${roomWithMessages.room.name}');
       return roomWithMessages.room;
     } on TypeError catch (e, stackTrace) {

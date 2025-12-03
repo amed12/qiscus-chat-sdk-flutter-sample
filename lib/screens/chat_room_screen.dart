@@ -37,6 +37,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     // Enter chat room
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ChatProvider>().enterChatRoom(widget.room);
+      // Scroll to bottom after initial load completes
+      Future.delayed(const Duration(milliseconds: 300), _scrollToBottom);
     });
 
     // Setup scroll listener for loading more messages
@@ -57,6 +59,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         _scrollController.position.minScrollExtent + 100) {
       context.read<ChatProvider>().loadPreviousMessages();
     }
+  }
+
+  void _scrollToBottomIfNeeded(List<QMessage> messages) {
+    // Defer to next frame so ListView has laid out
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
   Future<void> _sendMessage() async {
@@ -139,13 +146,37 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   @override
   Widget build(BuildContext context) {
     final currentUserId = context.read<AuthProvider>().currentUser?.id;
+    final currentRoom = context.read<ChatProvider>().currentRoom ?? widget.room;
 
     return Scaffold(
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.room.name ?? 'Chat'),
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 14,
+                  backgroundColor:
+                      Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                  child: Icon(
+                    widget.room.type == QRoomType.group
+                        ? Icons.group
+                        : Icons.person,
+                    size: 16,
+                    color: Theme.of(context).primaryColor,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    widget.room.name ?? 'Chat',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
             Consumer<ChatProvider>(
               builder: (context, chatProvider, _) {
                 final typingUsers = chatProvider.typingUsers.entries
@@ -153,13 +184,33 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     .map((e) => e.key)
                     .toList();
 
+                final presence = chatProvider.onlineUsers;
+                final isOnline = currentRoom.participants
+                    .where((p) => p.id != currentUserId)
+                    .any((p) => presence[p.id] == true);
+
                 if (typingUsers.isNotEmpty) {
                   return const Text(
                     'typing...',
                     style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
                   );
                 }
-                return const SizedBox.shrink();
+
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.circle,
+                      color: isOnline ? Colors.green : Colors.grey,
+                      size: 10,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isOnline ? 'Online' : 'Offline',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                );
               },
             ),
           ],
@@ -219,6 +270,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 if (chatProvider.isLoading) {
                   return const Center(child: CircularProgressIndicator());
                 }
+
+                // Auto-scroll when messages change
+                _scrollToBottomIfNeeded(chatProvider.messages);
 
                 if (chatProvider.messages.isEmpty) {
                   return const Center(
