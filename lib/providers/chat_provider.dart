@@ -220,10 +220,13 @@ class ChatProvider with ChangeNotifier {
     final room = _chatRooms[index];
     room.lastMessage = message;
 
+    final currentUserId = _qiscusService.sdk.currentUser?.id;
+    final isOwnMessage = currentUserId != null && message.sender.id == currentUserId;
+
     if (isCurrentRoom) {
-      room.unreadCount = 0;
-    } else {
-      room.unreadCount = (room.unreadCount) + 1;
+      room.unreadCount = 0; // reading this room, reset
+    } else if (!isOwnMessage) {
+      room.unreadCount = (room.unreadCount) + 1; // only count others' messages
     }
 
     _chatRooms[index] = room;
