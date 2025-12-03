@@ -189,6 +189,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 final isOnline = currentRoom.participants
                     .where((p) => p.id != currentUserId)
                     .any((p) => presence[p.id] == true);
+                final realtimeStatus = chatProvider.realtimeStatus;
 
                 if (typingUsers.isNotEmpty) {
                   return const Text(
@@ -233,6 +234,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                       Icons.circle,
                       color: statusColor,
                       size: 10,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      realtimeStatus.toString().split('.').last,
+                      style: const TextStyle(fontSize: 12),
                     ),
                   ],
                 );
