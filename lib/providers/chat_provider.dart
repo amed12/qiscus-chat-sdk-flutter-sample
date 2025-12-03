@@ -244,6 +244,11 @@ class ChatProvider with ChangeNotifier {
       // Subscribe to room for real-time updates
       _qiscusService.subscribeChatRoom(room);
 
+      // Publish online status when room is single
+      if (room.type == QRoomType.single) {
+        _qiscusService.sdk.publishOnlinePresence(isOnline: true);
+      }
+
       // Sync missed messages/events before fetching current room data
       await synchronizeMessages();
 
@@ -272,6 +277,9 @@ class ChatProvider with ChangeNotifier {
   void leaveChatRoom() {
     if (_currentRoom != null) {
       _qiscusService.unsubscribeChatRoom(_currentRoom!);
+      if (_currentRoom!.type == QRoomType.single) {
+        _qiscusService.sdk.publishOnlinePresence(isOnline: false);
+      }
       _currentRoom = null;
       _messages.clear();
       _typingUsers.clear();
