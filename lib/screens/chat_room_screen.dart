@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:qiscus_chat_sdk/qiscus_chat_sdk.dart';
 import 'package:qiscus_chat_flutter_sample/providers/chat_provider.dart';
 import 'package:qiscus_chat_flutter_sample/providers/auth_provider.dart';
-import 'package:qiscus_chat_flutter_sample/services/qiscus_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -201,20 +200,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   return const SizedBox.shrink();
                 }
 
-                Color statusColor;
-                switch (realtimeStatus) {
-                  case RealtimeStatus.connected:
-                    statusColor = Colors.green;
-                    break;
-                  case RealtimeStatus.reconnecting:
-                    statusColor = Colors.amber;
-                    break;
-                  case RealtimeStatus.disconnected:
-                  default:
-                    statusColor = Colors.redAccent;
-                    break;
-                }
-
                 return Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -227,12 +212,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     Text(
                       isOnline ? 'Online' : 'Offline',
                       style: const TextStyle(fontSize: 12),
-                    ),
-                    const SizedBox(width: 12),
-                    Icon(
-                      Icons.circle,
-                      color: statusColor,
-                      size: 10,
                     ),
                   ],
                 );
