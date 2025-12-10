@@ -111,17 +111,14 @@ class QiscusService {
 
     // Listen to connection status
     sdk.onConnected().listen((_) {
-      debugPrint('✅ Connected to Qiscus');
       _realtimeStatusController.add(RealtimeStatus.connected);
     });
 
     sdk.onDisconnected().listen((_) {
-      debugPrint('❌ Disconnected from Qiscus');
       _realtimeStatusController.add(RealtimeStatus.disconnected);
     });
 
     sdk.onReconnecting().listen((_) {
-      debugPrint('🔄 Reconnecting to Qiscus');
       _realtimeStatusController.add(RealtimeStatus.reconnecting);
     });
   }
