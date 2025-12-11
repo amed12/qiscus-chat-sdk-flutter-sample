@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.qiscus_chat_flutter_sample">
+    package="com.qiscus.sdk.sample">
    <application
         android:label="qiscus_chat_flutter_sample"
         android:name="${applicationName}"

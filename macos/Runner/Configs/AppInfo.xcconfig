@@ -8,7 +8,7 @@
 PRODUCT_NAME = qiscus_chat_flutter_sample
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.qiscusChatFlutterSample
+PRODUCT_BUNDLE_IDENTIFIER = com.qiscus.sdk.sample
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2022 com.example. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2022 com.qiscus.sdk.sample. All rights reserved.

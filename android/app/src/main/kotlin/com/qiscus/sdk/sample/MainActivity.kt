@@ -1,4 +1,4 @@
-package com.example.qiscus_chat_flutter_sample
+package com.qiscus.sdk.sample
 
 import io.flutter.embedding.android.FlutterActivity
 
