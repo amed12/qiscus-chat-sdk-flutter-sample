@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:qiscus_chat_sdk/qiscus_chat_sdk.dart';
 import 'package:qiscus_chat_flutter_sample/constants.dart';
+import 'package:qiscus_chat_flutter_sample/services/notification_service.dart';
 import 'package:qiscus_chat_flutter_sample/services/qiscus_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -34,6 +35,7 @@ class AuthProvider with ChangeNotifier {
       if (_qiscusService.isLoggedIn()) {
         _currentUser = _qiscusService.getCurrentUser();
         debugPrint('✅ User is already logged in via SDK: ${_currentUser?.id} - ${_currentUser?.name}');
+        await NotificationService.instance.syncDeviceTokenWithQiscus();
         _isLoading = false;
         notifyListeners();
         return;
@@ -97,6 +99,7 @@ class AuthProvider with ChangeNotifier {
       // Save login credentials for persistence
       await _saveCredentials(userId, userKey);
       debugPrint('Credentials saved to SharedPreferences');
+      await NotificationService.instance.syncDeviceTokenWithQiscus();
       
       _setLoading(false);
       return true;
@@ -117,6 +120,7 @@ class AuthProvider with ChangeNotifier {
     try {
       final account = await _qiscusService.loginWithToken(token: token);
       _currentUser = account;
+      await NotificationService.instance.syncDeviceTokenWithQiscus();
       _setLoading(false);
       return true;
     } catch (e) {
@@ -139,6 +143,7 @@ class AuthProvider with ChangeNotifier {
     _setLoading(true);
 
     try {
+      await NotificationService.instance.removeDeviceToken();
       await _qiscusService.logout();
       _currentUser = null;
       await _clearCredentials();

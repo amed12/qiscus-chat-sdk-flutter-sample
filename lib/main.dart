@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:qiscus_chat_flutter_sample/providers/auth_provider.dart';
 import 'package:qiscus_chat_flutter_sample/providers/chat_provider.dart';
 import 'package:qiscus_chat_flutter_sample/screens/splash_screen.dart';
+import 'package:qiscus_chat_flutter_sample/services/notification_service.dart';
 import 'package:qiscus_chat_flutter_sample/services/qiscus_service.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -12,9 +14,10 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   // Initialize Qiscus SDK
   await QiscusService.instance.initialize();
-  // await NotificationService.instance.init();
+  await NotificationService.instance.init();
 
   runApp(const MyApp());
 }
