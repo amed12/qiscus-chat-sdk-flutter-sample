@@ -179,6 +179,7 @@ class _ResumeSessionScreenState extends State<ResumeSessionScreen> {
           if (count <= 0) return const SizedBox.shrink();
 
           return FloatingActionButton.extended(
+            heroTag: 'resume_session_unread_fab',
             onPressed: _isLoading ? null : _resumeChat,
             icon: const Icon(Icons.chat_bubble),
             label: Text('$count unread'),

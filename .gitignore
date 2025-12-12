@@ -55,3 +55,4 @@ firebase_app_id_file.json
 firebase.json
 launch.json
 ios/GoogleService-Info.plist
+ios/build/

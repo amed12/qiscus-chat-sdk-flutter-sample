@@ -265,9 +265,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     children: [
                       Icon(Icons.wifi_off, size: 16, color: Colors.orange),
                       SizedBox(width: 8),
-                      Text(
-                        'Reconnecting... Please check your connection',
-                        style: TextStyle(color: Colors.orange),
+                      Flexible(
+                        child: Text(
+                          'Reconnecting... Please check your connection',
+                          style: TextStyle(color: Colors.orange),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ],
                   ),

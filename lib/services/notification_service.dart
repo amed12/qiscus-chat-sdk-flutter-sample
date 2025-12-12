@@ -113,6 +113,7 @@ class NotificationService {
 
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
     await _showRemoteNotification(message);
+    debugPrint('Notification received in foreground: ${message.data}');
   }
 
   void _handleMessageOpenedApp(RemoteMessage message) {
