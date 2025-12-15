@@ -263,7 +263,8 @@ class ChatProvider with ChangeNotifier {
 
       // Load messages
       final data = await _qiscusService.getChatRoomWithMessages(roomId: room.id);
-      _messages = data.messages.reversed.toList();
+      _messages = List<QMessage>.from(data.messages);
+      _sortMessages();
       _notifySafely(); // ensure listeners (UI) know messages are ready
 
       // Mark last message as read
@@ -438,7 +439,7 @@ class ChatProvider with ChangeNotifier {
         limit: 20,
       );
 
-      _messages.insertAll(0, oldMessages.reversed);
+      _mergeMessages(oldMessages);
       _isLoadingMore = false;
       _notifySafely();
     } catch (e) {
@@ -551,11 +552,8 @@ class ChatProvider with ChangeNotifier {
 
   /// Add message to list
   void _addMessage(QMessage message) {
-    final index = _messages.indexWhere((m) => m.id == message.id);
-    if (index == -1) {
-      _messages.add(message);
-      _notifySafely();
-    }
+    _mergeMessages([message]);
+    _notifySafely();
   }
 
   /// Update message status
@@ -563,26 +561,65 @@ class ChatProvider with ChangeNotifier {
     final index = _messages.indexWhere((m) => m.id == message.id);
     if (index != -1) {
       _messages[index] = message;
+      _sortMessages();
       _notifySafely();
     }
   }
 
   /// Update message in list (for replacing placeholder with actual message)
   void _updateMessageInList(QMessage oldMessage, QMessage newMessage) {
-    final index = _messages.indexWhere((m) => m.uniqueId == oldMessage.uniqueId);
+    final index = _messages.indexWhere(
+      (m) => m.uniqueId == oldMessage.uniqueId || m.id == oldMessage.id,
+    );
     if (index != -1) {
       _messages[index] = newMessage;
-      _notifySafely();
     } else {
-      // If not found by uniqueId, try to find by text and add new message
-      _addMessage(newMessage);
+      _messages.add(newMessage);
     }
+    _sortMessages();
+    _notifySafely();
   }
 
   /// Remove message from list
   void _removeMessage(QMessage message) {
     _messages.removeWhere((m) => m.id == message.id);
     _notifySafely();
+  }
+
+  bool _mergeMessages(List<QMessage> incomingMessages) {
+    var changed = false;
+
+    for (final message in incomingMessages) {
+      final index = _messages.indexWhere(
+        (m) => m.id == message.id || m.uniqueId == message.uniqueId,
+      );
+
+      if (index == -1) {
+        _messages.add(message);
+        changed = true;
+      } else {
+        _messages[index] = message;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      _sortMessages();
+    }
+
+    return changed;
+  }
+
+  void _sortMessages() {
+    _messages.sort((a, b) {
+      final timestampComparison = a.timestamp.compareTo(b.timestamp);
+      if (timestampComparison != 0) return timestampComparison;
+
+      final idComparison = a.id.compareTo(b.id);
+      if (idComparison != 0) return idComparison;
+
+      return a.uniqueId.compareTo(b.uniqueId);
+    });
   }
 
   void _setLoading(bool value) {
