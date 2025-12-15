@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/rendering.dart';
+import 'package:qiscus_chat_flutter_sample/constants.dart';
 import 'package:qiscus_chat_sdk/qiscus_chat_sdk.dart';
 
 enum RealtimeStatus { connected, reconnecting, disconnected }
@@ -44,7 +45,7 @@ class QiscusService {
   /// Replace 'YOUR_APP_ID' with your actual Qiscus App ID
   Future<void> initialize() async {
     try {
-      const appId = 'qchatsdk--y4ebyzbysjz';
+      const appId = APP_ID;
       debugPrint('🚀 Initializing Qiscus SDK with APP_ID: $appId');
       
       if (appId == 'YOUR_APP_ID') {
