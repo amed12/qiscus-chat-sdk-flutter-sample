@@ -29,7 +29,7 @@ class ChatProvider with ChangeNotifier {
   Map<String, bool> get onlineUsers => _onlineUsers;
   int get unreadCount => _unreadCount;
   Map<String, int> get uploadProgress => _uploadProgress;
-  
+
   /// Get upload progress for a specific message
   int getUploadProgress(String messageUniqueId) {
     return _uploadProgress[messageUniqueId] ?? 0;
@@ -201,7 +201,8 @@ class ChatProvider with ChangeNotifier {
       _qiscusService.subscribeChatRoom(room);
 
       // Load messages
-      final data = await _qiscusService.getChatRoomWithMessages(roomId: room.id);
+      final data =
+          await _qiscusService.getChatRoomWithMessages(roomId: room.id);
       _messages = data.messages.reversed.toList();
 
       // Mark last message as read
@@ -226,7 +227,7 @@ class ChatProvider with ChangeNotifier {
       _currentRoom = null;
       _messages = [];
       _typingUsers = {};
-      notifyListeners();
+      Future.microtask(() => notifyListeners());
     }
   }
 
@@ -246,30 +247,33 @@ class ChatProvider with ChangeNotifier {
   }
 
   /// Send file message with placeholder (like JavaScript flow)
-  Future<void> sendFileMessageWithPlaceholder(File file, {String? caption}) async {
+  Future<void> sendFileMessageWithPlaceholder(File file,
+      {String? caption}) async {
     if (_currentRoom == null) return;
 
     try {
       // Get file extension
       final fileName = file.path.split('/').last;
       final extension = fileName.split('.').last.toUpperCase();
-      
+
       // Prepare placeholder message
       final placeholderText = caption ?? 'File attachment .$extension';
       final placeholderMessage = _qiscusService.sdk.generateMessage(
         chatRoomId: _currentRoom!.id,
         text: placeholderText,
       );
-      
+
       // Add placeholder message to UI immediately
       _addMessage(placeholderMessage);
-      
+
       // Upload file and track progress
-      _qiscusService.sendFileMessage(
+      _qiscusService
+          .sendFileMessage(
         chatRoomId: _currentRoom!.id,
         file: file,
         caption: placeholderText,
-      ).listen(
+      )
+          .listen(
         (progress) {
           if (progress.data != null) {
             // File uploaded successfully, update the placeholder message
@@ -281,7 +285,8 @@ class ChatProvider with ChangeNotifier {
             print('✅ File uploaded: ${uploadedMessage.text}');
           } else {
             // Update upload progress
-            _uploadProgress[placeholderMessage.uniqueId] = progress.progress.toInt();
+            _uploadProgress[placeholderMessage.uniqueId] =
+                progress.progress.toInt();
             notifyListeners();
             print('📤 Upload progress: ${progress.progress}%');
           }
@@ -307,11 +312,13 @@ class ChatProvider with ChangeNotifier {
     if (_currentRoom == null) return;
 
     try {
-      _qiscusService.sendFileMessage(
+      _qiscusService
+          .sendFileMessage(
         chatRoomId: _currentRoom!.id,
         file: file,
         caption: caption,
-      ).listen(
+      )
+          .listen(
         (progress) {
           if (progress.data != null) {
             print('File uploaded: ${progress.data!.text}');
@@ -486,7 +493,8 @@ class ChatProvider with ChangeNotifier {
 
   /// Update message in list (for replacing placeholder with actual message)
   void _updateMessageInList(QMessage oldMessage, QMessage newMessage) {
-    final index = _messages.indexWhere((m) => m.uniqueId == oldMessage.uniqueId);
+    final index =
+        _messages.indexWhere((m) => m.uniqueId == oldMessage.uniqueId);
     if (index != -1) {
       _messages[index] = newMessage;
       notifyListeners();

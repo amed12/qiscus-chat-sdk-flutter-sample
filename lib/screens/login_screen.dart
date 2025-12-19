@@ -59,7 +59,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _fillDemoCredentials() {
-    _userIdController.text = 'demo-user-${DateTime.now().millisecondsSinceEpoch}';
+    _userIdController.text =
+        'demo-user-${DateTime.now().millisecondsSinceEpoch}';
     _userKeyController.text = 'demo-password';
     _usernameController.text = 'Demo User';
   }

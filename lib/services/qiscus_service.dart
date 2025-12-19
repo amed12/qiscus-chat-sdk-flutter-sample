@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/rendering.dart';
 import 'package:qiscus_chat_sdk/qiscus_chat_sdk.dart';
 
@@ -38,26 +39,28 @@ class QiscusService {
   /// Replace 'YOUR_APP_ID' with your actual Qiscus App ID
   Future<void> initialize() async {
     try {
-      const appId = 'qchatsdk--y4ebyzbysjz';
+      const appId = 'sdksample';
       debugPrint('🚀 Initializing Qiscus SDK with APP_ID: $appId');
-      
+
       if (appId == 'YOUR_APP_ID') {
-        throw Exception('Please replace YOUR_APP_ID with your actual Qiscus App ID in qiscus_service.dart');
+        throw Exception(
+            'Please replace YOUR_APP_ID with your actual Qiscus App ID in qiscus_service.dart');
       }
-      
+
       await sdk.setup(appId);
-      
+
       // Enable debug mode for development
-      sdk.enableDebugMode(enable: true, level: QLogLevel.verbose);
-      
+      // sdk.enableDebugMode(enable: true, level: QLogLevel.verbose);
+
       // Setup event listeners
       _setupEventListeners();
-      
+
       debugPrint('✅ Qiscus SDK initialized successfully');
     } on TypeError catch (e, stackTrace) {
       debugPrint('❌ Type error during initialization: $e');
       debugPrint('Stack trace: $stackTrace');
-      throw Exception('SDK initialization failed: Type casting error. Please check your APP_ID.');
+      throw Exception(
+          'SDK initialization failed: Type casting error. Please check your APP_ID.');
     } catch (e, stackTrace) {
       debugPrint('❌ Failed to initialize Qiscus SDK: $e');
       debugPrint('Stack trace: $stackTrace');
@@ -126,7 +129,7 @@ class QiscusService {
   }) async {
     try {
       debugPrint('🔐 Attempting login for user: $userId');
-      
+
       // Validate inputs
       if (userId.trim().isEmpty) {
         throw Exception('User ID cannot be empty');
@@ -134,20 +137,33 @@ class QiscusService {
       if (userKey.trim().isEmpty) {
         throw Exception('User key cannot be empty');
       }
-      
+
       final account = await sdk.setUser(
         userId: userId.trim(),
         userKey: userKey.trim(),
         username: username?.trim(),
         avatarUrl: avatarUrl?.trim(),
       );
-      
+
+      try {
+        final deviceToken = await FirebaseMessaging.instance.getToken();
+        if (deviceToken != null) {
+          await sdk.registerDeviceToken(
+            token: deviceToken,
+            isDevelopment: true,
+          );
+        }
+      } catch (_) {
+        debugPrint('⚠️ Failed to register device token for push notifications');
+      }
+
       debugPrint('✅ User logged in: ${account.id}');
       return account;
     } on TypeError catch (e, stackTrace) {
       debugPrint('❌ Type error during login: $e');
       debugPrint('Stack trace: $stackTrace');
-      throw Exception('Login failed: Type casting error. This usually means the server returned unexpected data. Please check your APP_ID and network connection.');
+      throw Exception(
+          'Login failed: Type casting error. This usually means the server returned unexpected data. Please check your APP_ID and network connection.');
     } catch (e, stackTrace) {
       debugPrint('❌ Login failed: $e');
       debugPrint('Stack trace: $stackTrace');
@@ -160,6 +176,17 @@ class QiscusService {
     try {
       final account = await sdk.setUserWithIdentityToken(token: token);
       debugPrint('✅ User logged in with token: ${account.id}');
+      try {
+        final deviceToken = await FirebaseMessaging.instance.getToken();
+        if (deviceToken != null) {
+          await sdk.registerDeviceToken(
+            token: deviceToken,
+            isDevelopment: true,
+          );
+        }
+      } catch (_) {
+        debugPrint('⚠️ Failed to register device token for push notifications');
+      }
       return account;
     } catch (e) {
       debugPrint('❌ Login with token failed: $e');
@@ -227,14 +254,16 @@ class QiscusService {
   Future<QChatRoom> getChatRoomById(int roomId) async {
     try {
       debugPrint('📥 Loading chat room: $roomId');
-      final roomWithMessages = await sdk.getChatRoomWithMessages(roomId: roomId);
-      
+      final roomWithMessages =
+          await sdk.getChatRoomWithMessages(roomId: roomId);
+
       debugPrint('✅ Chat room loaded: ${roomWithMessages.room.name}');
       return roomWithMessages.room;
     } on TypeError catch (e, stackTrace) {
       debugPrint('❌ Type error getting chat room: $e');
       debugPrint('Stack trace: $stackTrace');
-      throw Exception('Failed to load chat room: Type casting error. The server may have returned unexpected data.');
+      throw Exception(
+          'Failed to load chat room: Type casting error. The server may have returned unexpected data.');
     } catch (e, stackTrace) {
       debugPrint('❌ Get chat room failed: $e');
       debugPrint('Stack trace: $stackTrace');

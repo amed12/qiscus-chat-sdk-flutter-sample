@@ -241,9 +241,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                       );
                     }
 
-                    final messageIndex = chatProvider.isLoadingMore
-                        ? index - 1
-                        : index;
+                    final messageIndex =
+                        chatProvider.isLoadingMore ? index - 1 : index;
                     final message = chatProvider.messages[messageIndex];
                     final isMe = message.sender.id == currentUserId;
 
@@ -256,7 +255,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               },
             ),
           ),
-          _buildMessageInput(),
+          SafeArea(child: _buildMessageInput()),
         ],
       ),
     );
@@ -440,7 +439,8 @@ class MessageBubble extends StatelessWidget {
                   // Show upload progress if uploading
                   Consumer<ChatProvider>(
                     builder: (context, chatProvider, _) {
-                      final progress = chatProvider.getUploadProgress(message.uniqueId);
+                      final progress =
+                          chatProvider.getUploadProgress(message.uniqueId);
                       if (progress > 0 && progress < 100) {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -464,7 +464,8 @@ class MessageBubble extends StatelessWidget {
                                   'Uploading $progress%',
                                   style: TextStyle(
                                     fontSize: 10,
-                                    color: isMe ? Colors.white70 : Colors.black54,
+                                    color:
+                                        isMe ? Colors.white70 : Colors.black54,
                                     fontStyle: FontStyle.italic,
                                   ),
                                 ),
@@ -521,8 +522,8 @@ class MessageBubble extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (url.contains(RegExp(r'\.(jpg|jpeg|png|gif|webp)$',
-                caseSensitive: false)))
+            if (url.contains(
+                RegExp(r'\.(jpg|jpeg|png|gif|webp)$', caseSensitive: false)))
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: CachedNetworkImage(
@@ -531,8 +532,7 @@ class MessageBubble extends StatelessWidget {
                   fit: BoxFit.cover,
                   placeholder: (context, url) =>
                       const CircularProgressIndicator(),
-                  errorWidget: (context, url, error) =>
-                      const Icon(Icons.error),
+                  errorWidget: (context, url, error) => const Icon(Icons.error),
                 ),
               )
             else
