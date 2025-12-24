@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:qiscus_chat_flutter_sample/providers/auth_provider.dart';
 import 'package:qiscus_chat_flutter_sample/screens/login_screen.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:qiscus_chat_flutter_sample/widget/avatar_widget.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -120,19 +120,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 children: [
                   const SizedBox(height: 24),
-                  CircleAvatar(
+                  Avatar(
+                    url: user.avatarUrl,
+                    name: user.name,
                     radius: 60,
-                    backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                    backgroundImage: user.avatarUrl != null && user.avatarUrl!.isNotEmpty
-                        ? CachedNetworkImageProvider(user.avatarUrl!)
-                        : null,
-                    child: user.avatarUrl == null || user.avatarUrl!.isEmpty
-                        ? Icon(
-                            Icons.person,
-                            size: 60,
-                            color: Theme.of(context).primaryColor,
-                          )
-                        : null,
+                    backgroundColor:
+                        Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                    icon: Icons.person,
                   ),
                   const SizedBox(height: 24),
                   Card(

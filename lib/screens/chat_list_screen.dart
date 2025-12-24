@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:qiscus_chat_sdk/qiscus_chat_sdk.dart';
 import 'package:qiscus_chat_flutter_sample/providers/chat_provider.dart';
 import 'package:qiscus_chat_flutter_sample/screens/chat_room_screen.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:qiscus_chat_flutter_sample/widget/avatar_widget.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({Key? key}) : super(key: key);
@@ -180,14 +180,11 @@ class ChatRoomTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: CircleAvatar(
+      leading: Avatar(
+        url: room.avatarUrl,
+        radius: 20,
         backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-        backgroundImage: room.avatarUrl != null && room.avatarUrl!.isNotEmpty
-            ? CachedNetworkImageProvider(room.avatarUrl!)
-            : null,
-        child: room.avatarUrl == null || room.avatarUrl!.isEmpty
-            ? Icon(_getRoomIcon(), color: Theme.of(context).primaryColor)
-            : null,
+        icon: _getRoomIcon(),
       ),
       title: Text(
         _getRoomName(),

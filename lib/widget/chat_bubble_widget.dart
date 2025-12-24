@@ -32,7 +32,10 @@ class ChatBubble extends StatelessWidget {
         // textDirection: TextDirection.rtl,
         textDirection: flipped ? TextDirection.rtl : TextDirection.ltr,
         children: <Widget>[
-          Avatar(url: sender.avatarUrl!),
+          Avatar(
+            url: sender.avatarUrl,
+            name: sender.name,
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: Column(
@@ -179,7 +182,11 @@ class ChatBubble extends StatelessWidget {
               LinearProgressIndicator(value: progress.toDouble()),
             ],
             if ((message.payload?['url'] as String).startsWith('http'))
-              Image.network(message.payload!['url'] as String),
+              Image.network(
+                message.payload!['url'] as String,
+                errorBuilder: (_, __, ___) =>
+                    const Icon(Icons.broken_image, size: 36),
+              ),
             Positioned(
               bottom: 0,
               left: 0,

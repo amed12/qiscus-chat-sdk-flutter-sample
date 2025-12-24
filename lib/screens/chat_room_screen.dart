@@ -8,6 +8,7 @@ import 'package:qiscus_chat_flutter_sample/providers/auth_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:qiscus_chat_flutter_sample/widget/avatar_widget.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final QChatRoom room;
@@ -394,13 +395,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               itemBuilder: (context, index) {
                 final participant = participants[index];
                 return ListTile(
-                  leading: CircleAvatar(
-                    backgroundImage: participant.avatarUrl != null
-                        ? CachedNetworkImageProvider(participant.avatarUrl!)
-                        : null,
-                    child: participant.avatarUrl == null
-                        ? Text(participant.name[0].toUpperCase())
-                        : null,
+                  leading: Avatar(
+                    url: participant.avatarUrl,
+                    name: participant.name,
+                    backgroundColor:
+                        Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                    icon: Icons.person,
                   ),
                   title: Text(participant.name),
                   subtitle: Text(participant.id),
@@ -460,17 +460,12 @@ class MessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe) ...[
-            CircleAvatar(
+            Avatar(
+              url: message.sender.avatarUrl,
+              name: message.sender.name,
               radius: 16,
-              backgroundImage: message.sender.avatarUrl != null
-                  ? CachedNetworkImageProvider(message.sender.avatarUrl!)
-                  : null,
-              child: message.sender.avatarUrl == null
-                  ? Text(
-                      message.sender.name[0].toUpperCase(),
-                      style: const TextStyle(fontSize: 12),
-                    )
-                  : null,
+              backgroundColor: Colors.grey.shade200,
+              icon: Icons.person,
             ),
             const SizedBox(width: 8),
           ],
