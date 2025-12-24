@@ -259,6 +259,7 @@ class ChatProvider with ChangeNotifier {
     try {
       // Subscribe to room for real-time updates
       _qiscusService.subscribeChatRoom(room);
+      _qiscusService.subscribePresenceForRoom(room);
 
       // Publish online status when room is single
       if (room.type == QRoomType.single) {
@@ -294,6 +295,7 @@ class ChatProvider with ChangeNotifier {
   void leaveChatRoom() {
     if (_currentRoom != null) {
       _qiscusService.unsubscribeChatRoom(_currentRoom!);
+      _qiscusService.unsubscribePresenceForRoom(_currentRoom!);
       if (_currentRoom!.type == QRoomType.single) {
         _qiscusService.sdk.publishOnlinePresence(isOnline: false);
       }

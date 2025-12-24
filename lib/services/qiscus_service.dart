@@ -47,24 +47,26 @@ class QiscusService {
     try {
       const appId = APP_ID;
       debugPrint('🚀 Initializing Qiscus SDK with APP_ID: $appId');
-      
+
       if (appId == 'YOUR_APP_ID') {
-        throw Exception('Please replace YOUR_APP_ID with your actual Qiscus App ID in qiscus_service.dart');
+        throw Exception(
+            'Please replace YOUR_APP_ID with your actual Qiscus App ID in qiscus_service.dart');
       }
-      
+
       await sdk.setup(appId);
-      
+
       // Enable debug mode for development
-      sdk.enableDebugMode(enable: true, level: QLogLevel.verbose);
-      
+      sdk.enableDebugMode(enable: true, level: QLogLevel.debug);
+
       // Setup event listeners
       _setupEventListeners();
-      
+
       debugPrint('✅ Qiscus SDK initialized successfully');
     } on TypeError catch (e, stackTrace) {
       debugPrint('❌ Type error during initialization: $e');
       debugPrint('Stack trace: $stackTrace');
-      throw Exception('SDK initialization failed: Type casting error. Please check your APP_ID.');
+      throw Exception(
+          'SDK initialization failed: Type casting error. Please check your APP_ID.');
     } catch (e, stackTrace) {
       debugPrint('❌ Failed to initialize Qiscus SDK: $e');
       debugPrint('Stack trace: $stackTrace');
@@ -133,7 +135,7 @@ class QiscusService {
   }) async {
     try {
       debugPrint('🔐 Attempting login for user: $userId');
-      
+
       // Validate inputs
       if (userId.trim().isEmpty) {
         throw Exception('User ID cannot be empty');
@@ -141,20 +143,21 @@ class QiscusService {
       if (userKey.trim().isEmpty) {
         throw Exception('User key cannot be empty');
       }
-      
+
       final account = await sdk.setUser(
         userId: userId.trim(),
         userKey: userKey.trim(),
         username: username?.trim(),
         avatarUrl: avatarUrl?.trim(),
       );
-      
+
       debugPrint('✅ User logged in: ${account.id}');
       return account;
     } on TypeError catch (e, stackTrace) {
       debugPrint('❌ Type error during login: $e');
       debugPrint('Stack trace: $stackTrace');
-      throw Exception('Login failed: Type casting error. This usually means the server returned unexpected data. Please check your APP_ID and network connection.');
+      throw Exception(
+          'Login failed: Type casting error. This usually means the server returned unexpected data. Please check your APP_ID and network connection.');
     } catch (e, stackTrace) {
       debugPrint('❌ Login failed: $e');
       debugPrint('Stack trace: $stackTrace');
@@ -234,7 +237,8 @@ class QiscusService {
   Future<QChatRoom> getChatRoomById(int roomId) async {
     try {
       debugPrint('📥 Loading chat room: $roomId');
-      final roomWithMessages = await sdk.getChatRoomWithMessages(roomId: roomId);
+      final roomWithMessages =
+          await sdk.getChatRoomWithMessages(roomId: roomId);
 
       // Ensure lastMessage is populated from fetched messages
       if (roomWithMessages.messages.isNotEmpty) {
@@ -246,7 +250,8 @@ class QiscusService {
     } on TypeError catch (e, stackTrace) {
       debugPrint('❌ Type error getting chat room: $e');
       debugPrint('Stack trace: $stackTrace');
-      throw Exception('Failed to load chat room: Type casting error. The server may have returned unexpected data.');
+      throw Exception(
+          'Failed to load chat room: Type casting error. The server may have returned unexpected data.');
     } catch (e, stackTrace) {
       debugPrint('❌ Get chat room failed: $e');
       debugPrint('Stack trace: $stackTrace');
@@ -505,6 +510,38 @@ class QiscusService {
       await sdk.publishTyping(roomId: roomId, isTyping: isTyping);
     } catch (e) {
       debugPrint('❌ Publish typing failed: $e');
+    }
+  }
+
+  /// Subscribe to presence for the other participant in a single room.
+  /// Mirrors the guard logic from the legacy QiscusUtil to avoid errors when
+  /// rooms lack participants or aren't single chats.
+  void subscribePresenceForRoom(QChatRoom room) {
+    if (room.type != QRoomType.single || room.participants.isEmpty) return;
+
+    final currentUserId = sdk.currentUser?.id;
+    try {
+      final other = room.participants.firstWhere(
+        (u) => currentUserId == null || u.id != currentUserId,
+      );
+      subscribeUserOnlinePresence(other.id);
+    } catch (e) {
+      debugPrint('❌ Subscribe presence failed for room ${room.id}: $e');
+    }
+  }
+
+  /// Unsubscribe from presence for the other participant in a single room.
+  void unsubscribePresenceForRoom(QChatRoom room) {
+    if (room.type != QRoomType.single || room.participants.isEmpty) return;
+
+    final currentUserId = sdk.currentUser?.id;
+    try {
+      final other = room.participants.firstWhere(
+        (u) => currentUserId == null || u.id != currentUserId,
+      );
+      unsubscribeUserOnlinePresence(other.id);
+    } catch (e) {
+      debugPrint('❌ Unsubscribe presence failed for room ${room.id}: $e');
     }
   }
 
