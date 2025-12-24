@@ -104,6 +104,13 @@ class ChatProvider with ChangeNotifier {
     // Listen to realtime connection status
     _realtimeStatusSub =
         _qiscusService.onRealtimeStatus.listen((status) {
+      if (status == RealtimeStatus.connected) {
+        debugPrint('Realtime connected');
+      } else if (status == RealtimeStatus.reconnecting) {
+        debugPrint('Realtime reconnecting');
+      } else if (status == RealtimeStatus.disconnected) {
+        debugPrint('Realtime disconnected');
+      }
       _realtimeStatus = status;
       _notifySafely();
     });
