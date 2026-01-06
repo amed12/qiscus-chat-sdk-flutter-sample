@@ -14,14 +14,15 @@ class ChatProvider with ChangeNotifier {
   bool _isLoadingMore = false;
   String? _error;
   Map<String, bool> _typingUsers = {};
-  Map<String, bool> _onlineUsers = {};
+  final Map<String, bool> _onlineUsers = {};
   int _unreadCount = 0;
   // Track upload progress for each message (uniqueId -> progress percentage)
-  Map<String, int> _uploadProgress = {};
+  final Map<String, int> _uploadProgress = {};
 
   List<QChatRoom> get chatRooms => _chatRooms;
   QChatRoom? get currentRoom => _currentRoom;
-  List<QMessage> get messages => _messages;
+  List<QMessage> get messages =>
+      _messages..sort((m1, m2) => m1.timestamp.compareTo(m2.timestamp));
   bool get isLoading => _isLoading;
   bool get isLoadingMore => _isLoadingMore;
   String? get error => _error;
@@ -50,6 +51,16 @@ class ChatProvider with ChangeNotifier {
   void _setupEventListeners() {
     // Listen to new messages
     _messageReceivedSub = _qiscusService.onMessageReceived.listen((message) {
+      // set lastMessage for the room
+      var roomIndex = _chatRooms.indexWhere((r) => r.id == message.chatRoomId);
+      if (roomIndex >= 0) {
+        var room = _chatRooms[roomIndex];
+        room.unreadCount += 1;
+        if (room.lastMessage?.timestamp.isBefore(message.timestamp) == true) {
+          room.lastMessage = message;
+        }
+      }
+
       if (_currentRoom != null && message.chatRoomId == _currentRoom!.id) {
         _addMessage(message);
         // Auto mark as read
@@ -282,13 +293,13 @@ class ChatProvider with ChangeNotifier {
             // Remove from upload progress tracking
             _uploadProgress.remove(placeholderMessage.uniqueId);
             notifyListeners();
-            print('✅ File uploaded: ${uploadedMessage.text}');
+            debugPrint('✅ File uploaded: ${uploadedMessage.text}');
           } else {
             // Update upload progress
             _uploadProgress[placeholderMessage.uniqueId] =
                 progress.progress.toInt();
             notifyListeners();
-            print('📤 Upload progress: ${progress.progress}%');
+            debugPrint('📤 Upload progress: ${progress.progress}%');
           }
         },
         onError: (error) {
@@ -297,13 +308,13 @@ class ChatProvider with ChangeNotifier {
           _uploadProgress.remove(placeholderMessage.uniqueId);
           _error = 'Failed to upload file: $error';
           notifyListeners();
-          print('❌ Upload failed: $error');
+          debugPrint('❌ Upload failed: $error');
         },
       );
     } catch (e) {
       _error = e.toString();
       notifyListeners();
-      print('❌ Error: $e');
+      debugPrint('❌ Error: $e');
     }
   }
 
@@ -321,9 +332,9 @@ class ChatProvider with ChangeNotifier {
           .listen(
         (progress) {
           if (progress.data != null) {
-            print('File uploaded: ${progress.data!.text}');
+            debugPrint('File uploaded: ${progress.data!.text}');
           } else {
-            print('Upload progress: ${progress.progress}%');
+            debugPrint('Upload progress: ${progress.progress}%');
           }
         },
         onError: (error) {
@@ -394,7 +405,7 @@ class ChatProvider with ChangeNotifier {
         isTyping: isTyping,
       );
     } catch (e) {
-      print('Error publishing typing: $e');
+      debugPrint('Error publishing typing: $e');
     }
   }
 
@@ -469,7 +480,7 @@ class ChatProvider with ChangeNotifier {
       _unreadCount = await _qiscusService.getTotalUnreadCount();
       notifyListeners();
     } catch (e) {
-      print('Error updating unread count: $e');
+      debugPrint('Error updating unread count: $e');
     }
   }
 

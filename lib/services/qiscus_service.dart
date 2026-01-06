@@ -27,8 +27,18 @@ class QiscusService {
   final StreamController<QUserPresence> _userPresenceController =
       StreamController<QUserPresence>.broadcast();
 
+  DateTime _lastReceivedComment = DateTime.now();
+
   // Streams
-  Stream<QMessage> get onMessageReceived => _messageReceivedController.stream;
+  Stream<QMessage> get onMessageReceived =>
+      _messageReceivedController.stream.map((m) {
+        var now = DateTime.now();
+        var timestamp = now.difference(_lastReceivedComment);
+        _lastReceivedComment = now;
+        debugPrint(
+            '@qiscus.received[${timestamp.inSeconds}]: id(${m.id}) chatRoomId(${m.chatRoomId}) text(${m.text})');
+        return m;
+      });
   Stream<QMessage> get onMessageDelivered => _messageDeliveredController.stream;
   Stream<QMessage> get onMessageRead => _messageReadController.stream;
   Stream<QMessage> get onMessageDeleted => _messageDeletedController.stream;

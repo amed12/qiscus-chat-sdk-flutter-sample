@@ -189,7 +189,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 );
 
                 if (confirm == true) {
-                  if (mounted) {
+                  if (context.mounted) {
                     await context.read<ChatProvider>().clearMessages();
                   }
                 }
@@ -211,51 +211,71 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
-            child: Consumer<ChatProvider>(
-              builder: (context, chatProvider, _) {
-                if (chatProvider.isLoading) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+          Column(
+            children: [
+              Expanded(
+                child: Consumer<ChatProvider>(
+                  builder: (context, chatProvider, _) {
+                    if (chatProvider.isLoading) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-                if (chatProvider.messages.isEmpty) {
-                  return const Center(
-                    child: Text('No messages yet. Start the conversation!'),
-                  );
-                }
-
-                return ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: chatProvider.messages.length +
-                      (chatProvider.isLoadingMore ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (chatProvider.isLoadingMore && index == 0) {
+                    if (chatProvider.messages.isEmpty) {
                       return const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(8.0),
-                          child: CircularProgressIndicator(),
-                        ),
+                        child: Text('No messages yet. Start the conversation!'),
                       );
                     }
 
-                    final messageIndex =
-                        chatProvider.isLoadingMore ? index - 1 : index;
-                    final message = chatProvider.messages[messageIndex];
-                    final isMe = message.sender.id == currentUserId;
+                    return ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: chatProvider.messages.length +
+                          (chatProvider.isLoadingMore ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (chatProvider.isLoadingMore && index == 0) {
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        }
 
-                    return MessageBubble(
-                      message: message,
-                      isMe: isMe,
+                        final messageIndex =
+                            chatProvider.isLoadingMore ? index - 1 : index;
+                        final message = chatProvider.messages[messageIndex];
+                        final isMe = message.sender.id == currentUserId;
+
+                        return MessageBubble(
+                          message: message,
+                          isMe: isMe,
+                        );
+                      },
                     );
                   },
+                ),
+              ),
+              SafeArea(child: _buildMessageInput()),
+            ],
+          ),
+          Positioned(
+            bottom: 120,
+            right: 10,
+            child: FloatingActionButton.small(
+              onPressed: () {
+                debugPrint('scroll!!');
+                _scrollController.animateTo(
+                  _scrollController.offset,
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.linear,
                 );
               },
+              elevation: 2,
+              child: const Icon(Icons.arrow_drop_down_sharp),
             ),
           ),
-          SafeArea(child: _buildMessageInput()),
         ],
       ),
     );

@@ -63,7 +63,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void _firebaseMessagingOnMessageHandler(RemoteMessage event) {
   debugPrint('got foreground message');
-  print('got foreground message');
   var payload = event.data['payload'];
   var json = jsonDecode(payload ?? "{}") as Map<String, dynamic>;
   debugPrint('data: $json');
